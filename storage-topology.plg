@@ -2,8 +2,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.09b">
-<!ENTITY md5        "3cd922c2449152ced0ad03e8e705fecf">
+<!ENTITY version    "2026.10.10">
+<!ENTITY md5        "12398f6d16689611c5c0142903cd21a2">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
@@ -13,12 +13,24 @@
 <!ENTITY plgPATH    "/boot/config/plugins/&name;">
 ]>
 
-<!-- Read-only SAS storage topology page: controllers, ports, cables, disk shelves (power, cooling, sensors,
-     I/O modules, bays), firmware versions and per-drive link speed and errors, mapped to Unraid disk names. -->
+<!-- Read-only storage and network topology pages.
+     Storage: SAS controllers, ports, cables, disk shelves (power, cooling, sensors, I/O modules, bays), firmware
+     versions and per-drive link speed and errors, mapped to Unraid disk names.
+     Network: physical NICs (PCIe link, temperature, firmware), ports (speed, FEC, rings, error counters and their
+     growth), transceiver modules (DOM readings against their thresholds), bonds (LACP state), bridges, VLANs and
+     LLDP neighbours. -->
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;"
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.10
+- New page: Tools > System Information > Network Topology. Per physical NIC: PCIe link vs capability, temperature,
+  driver/firmware (and PSID and flash firmware via `mstflint q` on Mellanox/NVIDIA cards when mstflint is installed),
+  and per port: link, FEC, MTU, ring sizes, bond/bridge/VLAN membership, error and drop counters with growth since an
+  earlier collection, transceiver module details and DOM readings against the module's thresholds, and LLDP
+  neighbours (when lldpd/ulldpd is running). Bonds show mode, hash policy, LACP rate, aggregators, partner and churn.
+  Problems list flags degraded PCIe links, FEC off on 100G optics, module alarms, growing errors, bond member issues
+  and ring sizes below the maximum. Read-only, cached 60 s, one collection at a time.
 ###2026.10.09b
 - Support link now points to the Unraid forum thread.
 ###2026.10.09a
@@ -42,7 +54,7 @@ rm -f $(ls &plgPATH;/&name;-*.txz 2>/dev/null | grep -v '&version;')
 <FILE Run="/bin/bash">
 <INLINE>
 echo ""
-echo "Storage Topology &version; installed: Tools > System Information > Storage Topology"
+echo "Storage Topology &version; installed: Tools > System Information > Storage Topology and Network Topology"
 command -v sg_ses >/dev/null || echo "Note: sg_ses (sg3_utils) was not found, so enclosure health will be missing."
 found=
 for b in /sbin/storcli /usr/sbin/storcli /usr/local/sbin/storcli /usr/bin/storcli /usr/local/bin/storcli \
@@ -51,6 +63,7 @@ for b in /sbin/storcli /usr/sbin/storcli /usr/local/sbin/storcli /usr/bin/storcl
 done
 [ -n "$found" ] &amp;&amp; echo "Using storcli: $found" \
   || echo "Note: storcli was not found. Broadcom/LSI controller and per-drive detail needs it; the kernel view is used instead."
+command -v lldpctl >/dev/null || echo "Note: lldpctl was not found, so the network page has no LLDP neighbours (the LLDP plugin, ulldpd, provides it)."
 echo ""
 </INLINE>
 </FILE>
@@ -58,7 +71,7 @@ echo ""
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
 removepkg &package;
-rm -rf &plgPATH; /var/local/storage-topology /var/run/storage-topology.lock
+rm -rf &plgPATH; /var/local/storage-topology /var/run/storage-topology.lock /var/run/storage-topology-net.lock
 echo "Storage Topology removed."
 </INLINE>
 </FILE>

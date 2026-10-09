@@ -7,11 +7,11 @@
   <PluginURL>https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg</PluginURL>
   <PluginAuthor>davidcoulson</PluginAuthor>
   <Category>Tools: Drivers: Status:Stable</Category>
-  <Overview>Read-only view of your SAS storage: controllers and per-lane link rates, the cable map, disk shelves (I/O modules, power supplies, fans, voltages, temperatures, bays), firmware versions with mismatches highlighted, and each drive's link speed, paths and error counts mapped to its Unraid disk name. Uses storcli when installed and sg_ses (SES), otherwise the kernel's SAS and enclosure view. Nothing is changed on the system. Tools &gt; System Information &gt; Storage Topology.</Overview>
-  <Description>Read-only SAS storage topology and enclosure health: controllers, ports, cables, shelves, bays, firmware and per-drive link/error status.</Description>
+  <Overview>Read-only view of your storage and network hardware. Storage Topology: SAS controllers and per-lane link rates, the cable map, disk shelves (I/O modules, power supplies, fans, voltages, temperatures, bays), firmware versions with mismatches highlighted, and each drive's link speed, paths and error counts mapped to its Unraid disk name; uses storcli when installed and sg_ses (SES), otherwise the kernel's SAS and enclosure view. Network Topology: each physical NIC's PCIe link, temperature and firmware, every port's link, FEC, ring sizes and error counters (with growth), transceiver modules with DOM readings against their thresholds, bonds with LACP state, bridges, VLANs and LLDP neighbours. Nothing is changed on the system. Tools &gt; System Information &gt; Storage Topology / Network Topology.</Overview>
+  <Description>Read-only storage and network topology: SAS controllers, cables, shelves, bays and drives; NICs, ports, transceivers, bonds, VLANs and LLDP neighbours, with health and firmware.</Description>
   <Support>https://forums.unraid.net/topic/200846-plugin-storage-topology-sas-controllers-cables-shelves-and-bays-at-a-glance/</Support>
   <Project>https://github.com/davidcoulson/unraid-storage-topology</Project>
   <Icon>https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/images/storage-topology.png</Icon>
   <MinVer>7.0.0</MinVer>
-  <Requires>sg_ses (sg3_utils, included in Unraid 7). storcli is optional and needed for Broadcom/LSI MegaRAID detail.</Requires>
+  <Requires>sg_ses (sg3_utils, included in Unraid 7). storcli is optional and needed for Broadcom/LSI MegaRAID detail. Optional for the network page: lldpctl (LLDP plugin) for switch neighbours, mstflint for Mellanox/NVIDIA flash firmware and PSID.</Requires>
 </Container>

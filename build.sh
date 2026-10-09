@@ -12,7 +12,7 @@ PLUG=$SRC/usr/local/emhttp/plugins/storage-topology
 for f in "$PLUG"/include/*.php; do
   if command -v php >/dev/null; then php -l "$f" >/dev/null; fi
 done
-bash -n "$PLUG/scripts/collect.sh"
+for f in "$PLUG"/scripts/*.sh; do bash -n "$f"; done
 
 chmod 755 "$PLUG/scripts/"*.sh
 find "$SRC" -type d -exec chmod 755 {} +

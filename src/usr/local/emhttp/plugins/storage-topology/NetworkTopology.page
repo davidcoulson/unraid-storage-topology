@@ -1,0 +1,298 @@
+Menu="SystemInformation"
+Title="Network Topology"
+Icon="exchange"
+Tag="exchange"
+Markdown="false"
+---
+<?PHP
+/* Network topology: physical NICs -> ports -> transceiver modules -> LLDP neighbours, with bonds (LACP state),
+ * bridges and VLANs, PCIe link, temperatures, firmware, error counters and their growth since an earlier collection.
+ * Data: scripts/collect-net.sh (read-only ethtool/lspci/mstflint query/lldpctl/sysfs, cached 60 s), parsed by include/network.php.
+ */
+$em = "$docroot/plugins/storage-topology";
+require_once "$em/include/network.php";
+$maxAge = isset($_GET['refresh']) ? 5 : 60;
+exec("timeout 90 $em/scripts/collect-net.sh $maxAge 2>&1", $out, $rc);
+$m = net_load();
+if ($rc !== 0) {
+  array_unshift($m['problems'], ['level' => 'warn', 'text' => "Collector exit $rc - showing the last good data." . ($out ? ' ' . implode(' ', $out) : ''), 'who' => '']);
+  $m['level'] = net_worst(array_column($m['problems'], 'level'));
+}
+
+$unitF = ($display['unit'] ?? 'C') === 'F';
+$h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+$temp = fn($c) => $c === null ? '-' : ($unitF ? round($c * 9 / 5 + 32) . '&deg;F' : $c . '&deg;C');
+$chip = fn($level, $text, $title = '') => "<span class='st-chip st-$level'" . ($title ? " title='" . htmlspecialchars($title, ENT_QUOTES) . "'" : '') . ">$text</span>";
+$lvlText = ['ok' => 'Healthy', 'info' => 'Healthy (notes)', 'warn' => 'Warning', 'crit' => 'Critical'];
+$num = fn($n) => $n === null ? '-' : number_format($n);
+$levelFor = fn(array $who) => net_worst(array_column(array_filter($m['problems'], fn($p) => in_array($p['who'] ?? '', $who, true)), 'level'));
+$age = $m['collected'] ? time() - $m['collected'] : null;
+$win = $m['window'] !== null ? net_duration($m['window']) : null;
+// One counter cell: total since boot, plus growth since the baseline collection.
+$counterCell = function ($x) use ($num, $win) {
+  if ($x === null) return '<td class="num st-dim">-</td>';
+  $d = $x['delta'];
+  $grow = $d !== null && $d > 0;
+  $cls = match ($x['class']) {
+    'err', 'link', 'drop' => $grow ? 'st-warn' : ($x['now'] > 0 && $x['class'] !== 'link' ? 'st-info' : ''),
+    'fec' => $grow ? 'st-info' : '',
+    default => '',
+  };
+  return "<td class='num $cls'>" . $num($x['now']) . ($grow ? " <b>(+" . $num($d) . ")</b>" : ($d === 0 && $x['now'] > 0 ? " <span class='st-dim'>(+0)</span>" : '')) . '</td>';
+};
+// Module reading chips: one per lane, coloured against the module's own thresholds.
+$readingChips = function (array $mod, string $what) use ($h, $chip, $temp) {
+  $r = net_module_readings($mod)[$what] ?? [];
+  if (!$r) return '-';
+  $t = $mod['thr'][$what] ?? [];
+  $range = fn($k) => isset($t['low'][$k]) || isset($t['high'][$k]) ? ($t['low'][$k] ?? '?') . ' to ' . ($t['high'][$k] ?? '?') : '';
+  $unit = ['rx' => 'mW', 'tx' => 'mW', 'bias' => 'mA', 'temp' => 'C', 'volt' => 'V'][$what];
+  $out = [];
+  foreach ($r as $lane => $x) {
+    $text = match ($what) {
+      'rx', 'tx' => $x['dbm'] === null ? '-' : sprintf('%.2f', $x['dbm']),
+      'bias' => $x['v'] === null ? '-' : sprintf('%.1f', $x['v']),
+      'temp' => $temp($x['v']),
+      'volt' => $x['v'] === null ? '-' : sprintf('%.2f V', $x['v']),
+    };
+    $tip = ($lane ? "Lane $lane: " : '') . ($x['v'] ?? '-') . " $unit" . ($range('warning') ? "\nWarning outside {$range('warning')} $unit" : '')
+         . ($range('alarm') ? "\nAlarm outside {$range('alarm')} $unit" : '') . (!empty($x['flag']) ? "\nModule flag: {$x['flag']}" : '');
+    $out[] = $chip($x['level'], $text, $tip);
+  }
+  return implode(' ', $out);
+};
+?>
+<style>
+.st-wrap{max-width:1500px}
+.st-card{border:1px solid rgba(128,128,128,.3);border-radius:6px;padding:10px 14px;margin:12px 0}
+.st-card h3{margin:0 0 6px 0;font-size:1.15em;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.st-card h4{margin:12px 0 4px 0;font-size:1em;opacity:.85}
+table.st{width:100%;border-collapse:collapse;margin:4px 0}
+table.st th{text-align:left;padding:4px 8px;border-bottom:1px solid rgba(128,128,128,.4);white-space:nowrap;font-weight:600}
+table.st td{padding:4px 8px;border-bottom:1px solid rgba(128,128,128,.15);vertical-align:top}
+table.st td.num,table.st th.num{text-align:right;white-space:nowrap}
+.st-chip{display:inline-block;padding:1px 8px;border-radius:10px;font-size:.88em;white-space:nowrap;border:1px solid currentColor;margin:1px 0}
+.st-ok{color:#2e7d32}.st-info{color:#1e88e5}.st-warn{color:#e68a00}.st-crit{color:#d32f2f}.st-absent,.st-unknown,.st-dim{opacity:.55}
+.st-kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 18px;font-size:.95em}
+.st-kv div span:first-child{opacity:.65;margin-right:6px}
+.st-problems{margin:6px 0 0 0;padding-left:18px}.st-problems li{margin:2px 0}
+.st-scroll{overflow-x:auto}
+</style>
+<div class="st-wrap">
+<p>
+<?=$chip($m['level'] ?? 'ok', $lvlText[$m['level'] ?? 'ok'] ?? '')?>
+<span class="st-dim">Collected <?=$age === null ? 'never' : ($age < 5 ? 'just now' : "{$age} s ago")?>
+(<?=array_sum(array_column($m['timings'], 'ms'))?> ms, read-only ethtool/lspci/sysfs, cached 60 s).
+<?=$win !== null ? "Changes are shown against a collection {$h($win)} earlier." : 'Changes appear from the next collection on.'?></span>
+<a href="?refresh=1" style="margin-left:10px">Refresh</a>
+<a href="/Tools/StorageTopology" style="margin-left:10px">Storage Topology</a>
+</p>
+<?if ($m['problems']):?>
+<ul class="st-problems">
+<?foreach ($m['problems'] as $p):?><li class="st-<?=$p['level']?>"><?=$h($p['text'])?></li><?endforeach;?>
+</ul>
+<?endif;?>
+
+<?foreach ($m['cards'] as $key => $c):
+  $ports = array_map(fn($n) => $m['ports'][$n], $c['ports']);
+  $cl = $levelFor(array_merge([$key], $c['ports'], array_filter(array_column($ports, 'bond'))));
+  $pc = $c['pcie'];
+  $title = $c['product'] ?: $c['name'];
+?>
+<div class="st-card">
+<h3><i class="fa fa-<?=$c['wireless'] ? 'wifi' : 'exchange'?>"></i> <?=$h($title)?> <span class="st-dim"><?=$h(implode(', ', $c['functions']))?></span> <?=$chip($cl, $lvlText[$cl])?></h3>
+<div class="st-kv">
+<?if ($c['product']):?><div><span>Controller</span><?=$h($c['name'])?></div><?endif;?>
+<?if ($c['pn']):?><div><span>Part number</span><?=$h($c['pn'])?></div><?endif;?>
+<?if ($c['sn']):?><div><span>Serial</span><?=$h($c['sn'])?></div><?endif;?>
+<div><span>PCI ID</span><?=$h($c['ids'])?></div>
+<div><span>Driver</span><?=$h($c['driver'])?></div>
+<div><span>Firmware (running)</span><?=$h(preg_replace('/\s*\(.*\)$/', '', $c['fw']) ?: '-')?></div>
+<?if ($c['psid']):?><div><span>PSID</span><?=$h($c['psid'])?></div><?endif;?>
+<?if ($c['mst']):?>
+<div><span>Firmware (flash)</span><?=$h($c['mst']['fw'])?><?=$c['mst']['date'] ? " <span class='st-dim'>" . $h($c['mst']['date']) . '</span>' : ''?></div>
+<?if ($c['mst']['rom']):?><div><span>Boot ROM</span><?=$h($c['mst']['rom'])?></div><?endif;?>
+<?endif;?>
+<?if ($pc):?>
+<div><span>PCIe link</span><?=$chip($pc['level'], $h("{$pc['speed']} GT/s x{$pc['width']}"), sprintf('About %.0f Gb/s usable', $pc['gbps']) . ($pc['up'] ? "\nUpstream port {$pc['up']}: up to " . ($pc['up_speed'] ?? '?') . ' GT/s x' . ($pc['up_width'] ?? '?') : ''))?>
+<?=$pc['degraded'] ? "<span class='st-dim'>of " . $h("{$pc['cap_speed']} GT/s x{$pc['cap_width']}") . '</span>' : ''?></div>
+<?if (is_numeric($pc['numa']) && (int)$pc['numa'] >= 0):?><div><span>NUMA node</span><?=(int)$pc['numa']?></div><?endif;?>
+<?endif;?>
+<?if ($c['temps']):?>
+<div><span>Temperature</span><?foreach ($c['temps'] as $t) echo $chip($t['level'], $h($t['label']) . ' ' . $temp($t['c']), ($t['crit'] ? "Critical at {$t['crit']} C" : 'No critical threshold reported') . ($t['highest'] !== null ? "\nHighest since boot: {$t['highest']} C" : '')) . ' ';?></div>
+<?endif;?>
+<?if ($c['aer']):?>
+<div><span>PCIe errors (AER)</span><?foreach ($c['aer'] as $k => $a) echo $chip($a['now'] > 0 ? ($k === 'cor' ? 'info' : ($k === 'fatal' ? 'crit' : 'warn')) : 'ok', $h($a['label']) . ' ' . $num($a['now']) . (($a['delta'] ?? 0) > 0 ? " (+{$a['delta']})" : '')) . ' ';?></div>
+<?endif;?>
+</div>
+
+<h4>Ports</h4>
+<div class="st-scroll">
+<table class="st">
+<tr><th>Port</th><th>MAC</th><th>State</th><th>Speed</th><th>Autoneg</th><th>FEC</th><th>MTU</th><th>Rings (cur / max)</th><th>Member of</th><th>VLANs</th></tr>
+<?foreach ($ports as $p):
+  $stLvl = $p['up'] ? 'ok' : ($p['bond'] ? 'warn' : 'absent');
+  $chain = array_filter([$p['bond'] ?: ($p['master'] && $p['master'] !== $p['bridge'] ? $p['master'] : ''), $p['bridge']]);
+  $r = $p['ring'];
+  $ringLow = $r && (($r['rx'] ?? 0) < ($r['rx_max'] ?? 0) || ($r['tx'] ?? 0) < ($r['tx_max'] ?? 0));
+?>
+<tr><td><b><?=$h($p['name'])?></b></td><td class="st-dim"><?=$h($p['mac'])?></td><td><?=$chip($stLvl, $h($p['state'] ?: '?'))?></td>
+<td><?=$p['up'] ? $h(net_speed_text($p['speed']) . ($p['lanes'] ? " ({$p['lanes']} lanes)" : '') . ($p['duplex'] && $p['duplex'] !== 'full' ? " {$p['duplex']}" : '')) : '-'?>
+<?=$p['max_speed'] ? "<span class='st-dim'>max " . $h(net_speed_text($p['max_speed'])) . '</span>' : ''?></td>
+<td><?=$h($p['autoneg'] ?: '-')?></td>
+<td><?=$p['fec'] ? $chip($p['fec_warn'] ? 'warn' : ($p['up'] ? 'ok' : 'absent'), $h($p['fec']['active']), 'Configured: ' . $p['fec']['configured']) : '-'?></td>
+<td class="num"><?=$p['mtu'] ?: '-'?></td>
+<td><?=$r ? $chip($ringLow && $p['up'] ? 'info' : ($p['up'] ? 'ok' : 'absent'), $h("RX {$r['rx']} / {$r['rx_max']}, TX {$r['tx']} / {$r['tx_max']}")) : '-'?></td>
+<td><?=$chain ? $h(implode(' → ', $chain)) : '-'?></td>
+<td><?=$p['vlans'] ? $h(implode(', ', $p['vlans'])) : '-'?></td></tr>
+<?endforeach;?>
+</table>
+</div>
+
+<?$mods = array_filter($ports, fn($p) => $p['module']);
+if ($mods):?>
+<h4>Modules and cables</h4>
+<div class="st-scroll">
+<table class="st">
+<tr><th>Port</th><th>Module</th><th>Vendor / part</th><th>Serial</th><th>Type</th><th>Temp</th><th>Voltage</th><th>Rx power (dBm)</th><th>Tx power (dBm)</th><th>Laser bias (mA)</th></tr>
+<?foreach ($mods as $p): $mod = $p['module'];?>
+<tr><td><b><?=$h($p['name'])?></b></td><td><?=$h($mod['id'])?><?=$mod['connector'] ? "<br><span class='st-dim'>" . $h($mod['connector']) . '</span>' : ''?></td>
+<td><?=$h(trim("{$mod['vendor']} {$mod['pn']}"))?><?=$mod['rev'] ? " <span class='st-dim'>rev " . $h($mod['rev']) . '</span>' : ''?></td>
+<td><?=$h($mod['sn'])?><?=$mod['date'] ? "<br><span class='st-dim'>" . $h($mod['date']) . '</span>' : ''?></td>
+<td><?=$h($mod['type'] ?: '-')?><?=$mod['length'] ? "<br><span class='st-dim'>" . $h($mod['length']) . '</span>' : ''?></td>
+<?if ($mod['dom']):?>
+<td><?=$readingChips($mod, 'temp')?></td><td><?=$readingChips($mod, 'volt')?></td>
+<td><?=$readingChips($mod, 'rx')?></td><td><?=$readingChips($mod, 'tx')?></td><td><?=$readingChips($mod, 'bias')?></td>
+<?else:?>
+<td colspan="5" class="st-dim">No diagnostics (passive copper cable, or a module without DOM).</td>
+<?endif;?>
+</tr>
+<?endforeach;?>
+</table>
+</div>
+<p class="st-dim" style="margin:2px 0">Readings are coloured against the module's own warning and alarm thresholds; hover a value for lane, mW and thresholds.</p>
+<?endif;?>
+
+<?// Counters as rows, ports as columns.
+$keys = [];
+foreach ($ports as $p) foreach ($p['counters'] as $k => $x) $keys[$k] = $x['label'];
+$keys = array_intersect_key(array_map(fn($x) => $x[0], NET_COUNTERS), $keys);
+$allZero = !array_filter($ports, fn($p) => array_filter($p['counters'], fn($x) => $x['now'] > 0));
+if ($keys && $allZero):?>
+<p class="st-dim" style="margin:8px 0 0 0">Error, drop and link-down counters are all zero.</p>
+<?elseif ($keys):?>
+<h4>Counters since boot <?=$win !== null ? "<span class='st-dim'>(+ growth in the last " . $h($win) . ')</span>' : ''?></h4>
+<div class="st-scroll">
+<table class="st" style="width:auto;min-width:50%">
+<tr><th>Counter</th><?foreach ($ports as $p):?><th class="num"><?=$h($p['name'])?></th><?endforeach;?></tr>
+<?foreach ($keys as $k => $label):?>
+<tr><td><?=$h($label)?> <span class="st-dim"><?=$h(str_replace('sys.', '', $k))?></span></td><?foreach ($ports as $p) echo $counterCell($p['counters'][$k] ?? null);?></tr>
+<?endforeach;?>
+</table>
+</div>
+<?$other = array_filter($ports, fn($p) => $p['other']);
+if ($other):?>
+<details><summary class="st-dim">Other non-zero driver counters (<?=array_sum(array_map(fn($p) => count($p['other']), $other))?>)</summary>
+<table class="st" style="width:auto">
+<tr><th>Port</th><th>Counter</th><th class="num">Since boot</th><th class="num">Growth</th></tr>
+<?foreach ($other as $p) foreach ($p['other'] as $k => $x):?>
+<tr><td><?=$h($p['name'])?></td><td><?=$h($k)?></td><td class="num"><?=$num($x['now'])?></td><td class="num"><?=$x['delta'] === null ? '-' : ($x['delta'] > 0 ? '<b>+' . $num($x['delta']) . '</b>' : '0')?></td></tr>
+<?endforeach;?>
+</table>
+</details>
+<?endif;?>
+<?endif;?>
+
+<?$nb = array_filter($ports, fn($p) => $p['lldp']);
+if ($nb):?>
+<h4>LLDP neighbours</h4>
+<div class="st-scroll">
+<table class="st">
+<tr><th>Port</th><th>Switch</th><th>Switch port</th><th>Port description</th><th>VLAN</th><th>Model</th><th>Management</th><th>LAG ID</th></tr>
+<?foreach ($nb as $p): $l = $p['lldp'];?>
+<tr><td><b><?=$h($p['name'])?></b></td><td title="<?=$h($l['descr'])?>"><?=$h($l['switch'] ?: $l['chassis_id'])?></td><td><?=$h($l['port_id'])?></td><td><?=$h($l['port_descr'])?></td>
+<td><?=$l['vlans'] ? $h(implode(', ', array_map(fn($v) => $v['id'] . ($v['pvid'] ? ' (PVID)' : ''), $l['vlans']))) : '-'?></td>
+<td><?=$h($l['model'] ?: '-')?></td><td class="st-dim"><?=$h(implode(', ', $l['mgmt']) ?: '-')?></td><td><?=$l['lag'] !== null ? $h($l['lag']) : '-'?></td></tr>
+<?endforeach;?>
+</table>
+</div>
+<?endif;?>
+</div>
+<?endforeach;?>
+
+<?foreach ($m['bonds'] as $bn => $b):
+  $bl = $levelFor([$bn]);
+  $lacp = stripos($b['mode'], '802.3ad') !== false;
+  $u = $m['uplinks'][$bn] ?? null;
+?>
+<div class="st-card">
+<h3><i class="fa fa-link"></i> <?=$h($bn)?> <span class="st-dim"><?=$h($b['mode'])?></span> <?=$chip($bl, $lvlText[$bl])?></h3>
+<div class="st-kv">
+<div><span>MII status</span><?=$chip($b['mii'] === 'up' ? 'ok' : 'crit', $h($b['mii'] ?: '?'))?></div>
+<?if ($b['hash']):?><div><span>Transmit hash</span><?=$h($b['hash'])?></div><?endif;?>
+<?if ($lacp):?>
+<div><span>LACP rate</span><?=$h($b['lacp_rate'])?></div>
+<div><span>Active aggregator</span><?=$h($b['agg'] ?? '-')?> (<?=$h($b['agg_ports'] ?? 0)?> ports)</div>
+<div><span>Partner MAC</span><?=$h($b['partner_mac'] ?: '-')?></div>
+<div><span>Keys (actor / partner)</span><?=$h($b['actor_key'])?> / <?=$h($b['partner_key'])?></div>
+<?endif;?>
+<?if ($b['active_slave'] !== ''):?><div><span>Active member</span><?=$h($b['active_slave'])?></div><?endif;?>
+<?if ($u && $u['bridge']):?><div><span>Bridge</span><?=$h($u['bridge'])?></div><?endif;?>
+</div>
+<div class="st-scroll">
+<table class="st">
+<tr><th>Member</th><th>MII</th><th>Speed</th><?if ($lacp):?><th>Aggregator</th><th>Our LACP state</th><th>Partner LACP state</th><th>Partner port</th><th>Churn (actor / partner)</th><?endif;?><th>Link failures</th></tr>
+<?foreach ($b['slaves'] as $sn => $s):
+  $ok = fn($st) => $st !== null && ($st & 0x38) === 0x38;
+?>
+<tr><td><b><?=$h($sn)?></b></td><td><?=$chip($s['mii'] === 'up' ? 'ok' : 'warn', $h($s['mii']))?></td><td><?=$h(preg_match('/^(\d+) Mbps$/', $s['speed'], $sp) ? net_speed_text((int)$sp[1]) : $s['speed'])?></td>
+<?if ($lacp):?>
+<td><?=$chip($s['agg'] === $b['agg'] ? 'ok' : 'warn', $h($s['agg'] ?? '-'))?></td>
+<td><?=$s['actor_state'] === null ? '-' : $chip($ok($s['actor_state']) ? 'ok' : 'warn', (string)$s['actor_state'], net_lacp_state($s['actor_state']))?> <span class="st-dim"><?=$h(net_lacp_state($s['actor_state']))?></span></td>
+<td><?=$s['partner_state'] === null ? '-' : $chip($ok($s['partner_state']) ? 'ok' : 'warn', (string)$s['partner_state'], net_lacp_state($s['partner_state']))?></td>
+<td><?=$h($s['partner_port'] ?: '-')?></td>
+<td><?=$chip(in_array('churned', [$s['actor_churn'], $s['partner_churn']], true) ? 'warn' : 'ok', $h("{$s['actor_churn']} / {$s['partner_churn']}"), "Churned count: {$s['actor_churned']} / {$s['partner_churned']}")?></td>
+<?endif;?>
+<td class="num"><?=$s['failures']?><?=($s['failures_delta'] ?? 0) > 0 ? " <b class='st-warn'>(+{$s['failures_delta']})</b>" : ''?></td></tr>
+<?endforeach;?>
+</table>
+</div>
+</div>
+<?endforeach;?>
+
+<?if ($m['uplinks']):?>
+<div class="st-card">
+<h3><i class="fa fa-sitemap"></i> Bridges and VLANs</h3>
+<div class="st-scroll">
+<table class="st">
+<tr><th>Uplink</th><th>Ports</th><th>Bridge (untagged)</th><th>VLANs &rarr; bridge</th><th>Also on these bridges</th></tr>
+<?foreach ($m['uplinks'] as $u):?>
+<tr><td><b><?=$h($u['name'])?></b></td><td><?=$h(implode(', ', $u['members']))?></td><td><?=$h($u['bridge'] ?: '-')?></td>
+<td><?=$u['vlans'] ? implode(' ', array_map(fn($v) => $chip('ok', $h($v['vid'] . ($v['bridge'] ? " → {$v['bridge']}" : '')), $v['iface']), $u['vlans'])) : '-'?></td>
+<td><?=$u['others'] ? $h(implode('; ', array_map(fn($b, $x) => "$b: " . implode(', ', $x), array_keys($u['others']), $u['others']))) : '-'?></td></tr>
+<?endforeach;?>
+</table>
+</div>
+<p class="st-dim" style="margin:4px 0 0 0">vnet interfaces are VM network ports, veth are containers. Docker's own bridges and libvirt's virbr0 are not shown.</p>
+</div>
+<?endif;?>
+
+<?if ($m['firmware']):?>
+<div class="st-card">
+<h3><i class="fa fa-code-fork"></i> Firmware</h3>
+<table class="st">
+<tr><th>Component</th><th>Versions</th></tr>
+<?foreach ($m['firmware'] as $what => $vers):?>
+<tr><td><?=$h($what)?></td><td><?foreach ($vers as $v => $who) echo $chip(count($vers) > 1 ? 'warn' : 'ok', $h($v) . ' &times;' . count($who), implode(', ', $who)) . ' ';?></td></tr>
+<?endforeach;?>
+</table>
+<p class="st-dim" style="margin:4px 0 0 0">Amber means the same part runs different versions. Hover a version to see where it runs. This page does not look up newer releases.</p>
+</div>
+<?endif;?>
+
+<?if ($m['errors']):?>
+<p class="st-warn">Collection problems: <?=$h(implode('; ', $m['errors']))?></p>
+<?endif;?>
+<?$slow = array_column($m['timings'], 'ms'); $slow = array_combine(array_keys($m['timings']), $slow); arsort($slow);?>
+<p class="st-dim">Cache: <code>/var/local/storage-topology/net/current</code>. <?=count($m['timings'])?> commands; slowest: <?=$h(implode(', ', array_map(fn($k, $v) => "$k $v ms", array_keys(array_slice($slow, 0, 3, true)), array_slice($slow, 0, 3, true))))?>.</p>
+</div>
