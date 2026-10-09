@@ -2,8 +2,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.12">
-<!ENTITY md5        "309b4948f8661ba31ce4b65291a6f28a">
+<!ENTITY version    "2026.10.12a">
+<!ENTITY md5        "ddaec423c0354b341be0f302ff671001">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
@@ -24,6 +24,8 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.12a
+- Firmware table: shelf PSUs grouped by part number, so different PSU hardware revisions on their own firmware are not shown as a mismatch.
 ###2026.10.12
 - Storage: enclosures where "sg_ses --json --join" fails are read page by page instead (configuration, status, element
   descriptors and additional element status) and joined the way sg_ses does, so they show instead of "no SES data".

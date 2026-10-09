@@ -267,7 +267,10 @@ $fw = [];
 foreach ($m['controllers'] as $c) $fw['Controller'][$c['fw_package'] . " ({$c['fw']})"][] = "{$c['model']} c{$c['id']}";
 foreach ($m['shelves'] as $s) {
   foreach ($s['ioms'] as $i) $fw['Shelf I/O modules'][$i['fw']][] = "{$s['label']} {$i['name']}";
-  foreach ($s['groups']['psu'] as $n => $x) if ($x['fw'] !== '') $fw['Shelf PSUs'][$x['fw']][] = "{$s['label']} " . ($x['name'] !== '' ? topo_short_name($x['name']) : 'PSU ' . ($n + 1));
+  // PSU firmware is specific to the PSU's hardware revision, so compare versions per part number: different
+  // revisions on different firmware is normal, and only the same part on different versions is a mismatch.
+  foreach ($s['groups']['psu'] as $n => $x) if ($x['fw'] !== '')
+    $fw[trim('Shelf PSUs ' . trim((string)($x['pn'] ?? '')))][$x['fw']][] = "{$s['label']} " . ($x['name'] !== '' ? topo_short_name($x['name']) : 'PSU ' . ($n + 1));
 }
 foreach ($m['drives'] as $d) if ($d['fw']) $fw["Drives: {$d['model']}"][$d['fw']][] = $d['unraid'] ?: ($d['dev'] ?: "e{$d['eid']}/s{$d['slot']}");
 ?>
