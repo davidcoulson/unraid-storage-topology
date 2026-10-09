@@ -54,6 +54,11 @@ open an issue with the output of the commands above (remove serial numbers if yo
 Labels such as "IOM A/B", port numbers and cable details come from the enclosure's SES element order and
 NetApp's descriptor format. Other enclosures still get status and sensors, with fewer labels.
 
+## Support
+
+Unraid forum thread: https://forums.unraid.net/topic/200846-plugin-storage-topology-sas-controllers-cables-shelves-and-bays-at-a-glance/
+Bugs and hardware reports can also go to GitHub issues.
+
 ## Install
 
 Plugins → Install Plugin, and paste:

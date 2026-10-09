@@ -2,12 +2,12 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.09a">
+<!ENTITY version    "2026.10.09b">
 <!ENTITY md5        "3cd922c2449152ced0ad03e8e705fecf">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
-<!ENTITY supportURL "https://github.com/davidcoulson/unraid-storage-topology/issues">
+<!ENTITY supportURL "https://forums.unraid.net/topic/200846-plugin-storage-topology-sas-controllers-cables-shelves-and-bays-at-a-glance/">
 <!ENTITY package    "&name;-&version;-x86_64-1">
 <!ENTITY packageURL "&gitURL;/releases/download/&version;/&package;.txz">
 <!ENTITY plgPATH    "/boot/config/plugins/&name;">
@@ -19,6 +19,8 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.09b
+- Support link now points to the Unraid forum thread.
 ###2026.10.09a
 - Install message: report storcli correctly (it said "not found" when only some of the searched paths were missing).
 ###2026.10.09
