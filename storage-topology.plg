@@ -2,8 +2,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.10">
-<!ENTITY md5        "12398f6d16689611c5c0142903cd21a2">
+<!ENTITY version    "2026.10.10a">
+<!ENTITY md5        "a6b1983e3e338a967b60f30364aa8f7d">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
@@ -23,6 +23,9 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.10a
+- Network: no PCIe link-speed notes for cards whose ports are all down (unused cards often train down while idle).
+- Network: module table wraps lane readings instead of scrolling sideways.
 ###2026.10.10
 - New page: Tools > System Information > Network Topology. Per physical NIC: PCIe link vs capability, temperature,
   driver/firmware (and PSID and flash firmware via `mstflint q` on Mellanox/NVIDIA cards when mstflint is installed),

@@ -77,6 +77,9 @@ table.st td.num,table.st th.num{text-align:right;white-space:nowrap}
 .st-kv div span:first-child{opacity:.65;margin-right:6px}
 .st-problems{margin:6px 0 0 0;padding-left:18px}.st-problems li{margin:2px 0}
 .st-scroll{overflow-x:auto}
+table.st-mods td{white-space:normal}
+table.st-mods td .st-chip{margin:1px 0}
+table.st-mods td.lanes{max-width:190px}
 </style>
 <div class="st-wrap">
 <p>
@@ -153,7 +156,7 @@ table.st td.num,table.st th.num{text-align:right;white-space:nowrap}
 if ($mods):?>
 <h4>Modules and cables</h4>
 <div class="st-scroll">
-<table class="st">
+<table class="st st-mods">
 <tr><th>Port</th><th>Module</th><th>Vendor / part</th><th>Serial</th><th>Type</th><th>Temp</th><th>Voltage</th><th>Rx power (dBm)</th><th>Tx power (dBm)</th><th>Laser bias (mA)</th></tr>
 <?foreach ($mods as $p): $mod = $p['module'];?>
 <tr><td><b><?=$h($p['name'])?></b></td><td><?=$h($mod['id'])?><?=$mod['connector'] ? "<br><span class='st-dim'>" . $h($mod['connector']) . '</span>' : ''?></td>
@@ -162,7 +165,7 @@ if ($mods):?>
 <td><?=$h($mod['type'] ?: '-')?><?=$mod['length'] ? "<br><span class='st-dim'>" . $h($mod['length']) . '</span>' : ''?></td>
 <?if ($mod['dom']):?>
 <td><?=$readingChips($mod, 'temp')?></td><td><?=$readingChips($mod, 'volt')?></td>
-<td><?=$readingChips($mod, 'rx')?></td><td><?=$readingChips($mod, 'tx')?></td><td><?=$readingChips($mod, 'bias')?></td>
+<td class="lanes"><?=$readingChips($mod, 'rx')?></td><td class="lanes"><?=$readingChips($mod, 'tx')?></td><td class="lanes"><?=$readingChips($mod, 'bias')?></td>
 <?else:?>
 <td colspan="5" class="st-dim">No diagnostics (passive copper cable, or a module without DOM).</td>
 <?endif;?>

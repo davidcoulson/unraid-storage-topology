@@ -533,14 +533,16 @@ function net_problems(array &$m): void {
   foreach ($m['cards'] as $key => $c) {
     $who = $c['name'] . ' (' . implode(', ', $c['ports']) . ')';
     $pc = $c['pcie'];
-    if ($pc && $pc['degraded']) {
+    // Cards with every port down are left alone: unused cards are expected, and many train their link down while idle.
+    $inUse = (bool)array_filter($c['ports'], fn($n) => $m['ports'][$n]['up'] ?? false);
+    if ($pc && $pc['degraded'] && $inUse) {
       $txt = "$who: PCIe link runs at {$pc['speed']} GT/s x{$pc['width']} but the card supports {$pc['cap_speed']} GT/s x{$pc['cap_width']}";
       $txt .= $pc['slot_limited'] ? ' (the slot it is in supports at most ' . ($pc['up_speed'] ?? '?') . ' GT/s x' . ($pc['up_width'] ?? '?') . ')' : '';
       $txt .= $pc['short'] ? sprintf('. About %.0f Gb/s is less than the ports can carry (%.0f Gb/s).', $pc['gbps'], $pc['need'])
                            : ($pc['need'] ? sprintf('. About %.0f Gb/s is still enough for its ports (%.0f Gb/s).', $pc['gbps'], $pc['need']) : '.');
       if (!$pc['slot_limited']) $txt .= ' The slot supports the full link, so check the riser or BIOS PCIe settings; some cards also train down while idle.';
       $add($pc['level'], $txt, $key);
-    } elseif ($pc && $pc['need'] && $pc['gbps'] && $pc['gbps'] < $pc['need'] * 0.9) {
+    } elseif ($inUse && $pc && $pc['need'] && $pc['gbps'] && $pc['gbps'] < $pc['need'] * 0.9) {
       $add('info', sprintf("$who: the card's PCIe link (about %.0f Gb/s) cannot carry all ports at full speed at once (%.0f Gb/s).", $pc['gbps'], $pc['need']), $key);
     }
     foreach ($c['temps'] as $t) if ($t['level'] !== 'ok')
