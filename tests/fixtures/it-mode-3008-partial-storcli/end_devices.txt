@@ -1,0 +1,5 @@
+end_device-0:0:0|0x50000d1e0c0de03e|ssp|port-0:0:0|phy-0:0:35|0:0:0:0|13|ADAPTEC|AEC-82885T|
+end_device-0:0:1|0x50000d1e0c0de008|sata|port-0:0:1|phy-0:0:8|0:0:1:0|0|ATA|ST8000VN004-2M2101|sdb
+end_device-0:0:2|0x50000d1e0c0de009|sata|port-0:0:2|phy-0:0:9|0:0:2:0|0|ATA|ST8000VN004-2M2101|sdc
+end_device-0:0:3|0x50000d1e0c0de00a|sata|port-0:0:3|phy-0:0:10|0:0:3:0|0|ATA|ST8000VN004-2M2101|sdd
+end_device-0:0:4|0x50000d1e0c0de00b|sata|port-0:0:4|phy-0:0:11|0:0:4:0|0|ATA|ST8000VN004-2M2101|sde

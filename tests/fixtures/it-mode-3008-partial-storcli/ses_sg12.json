@@ -1,0 +1,487 @@
+{
+ "json_format_version": {
+  "major": 1,
+  "minor": 0
+ },
+ "join_of_diagnostic_pages": {
+  "element_list": [
+   {
+    "element_type": {
+     "i": 1,
+     "meaning": "Device slot"
+    },
+    "descriptor": "",
+    "element_number": -1,
+    "overall": 1,
+    "individual": false,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 0,
+      "meaning": "Unsupported"
+     }
+    }
+   },
+   {
+    "element_type": {
+     "i": 1,
+     "meaning": "Device slot"
+    },
+    "descriptor": "",
+    "element_number": 0,
+    "overall": 0,
+    "individual": true,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 1,
+      "meaning": "OK"
+     },
+     "fault_sensed": 0,
+     "fault_reqstd": 0,
+     "ident": 0
+    },
+    "additional_element_status_descriptor": {
+     "descriptor_type": 0,
+     "number_of_phy_descriptors": 1,
+     "not_all_phys": 0,
+     "device_slot_number": 0,
+     "phy_descriptor_list": [
+      {
+       "device_type": {
+        "i": 1,
+        "meaning": "end device"
+       },
+       "ssp_target_port": 1,
+       "attached_sas_address": 5764621945736650815,
+       "sas_address": 5764621945736650760,
+       "phy_index": 0
+      }
+     ]
+    }
+   },
+   {
+    "element_type": {
+     "i": 1,
+     "meaning": "Device slot"
+    },
+    "descriptor": "",
+    "element_number": 1,
+    "overall": 0,
+    "individual": true,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 1,
+      "meaning": "OK"
+     },
+     "fault_sensed": 0,
+     "fault_reqstd": 0,
+     "ident": 0
+    },
+    "additional_element_status_descriptor": {
+     "descriptor_type": 0,
+     "number_of_phy_descriptors": 1,
+     "not_all_phys": 0,
+     "device_slot_number": 1,
+     "phy_descriptor_list": [
+      {
+       "device_type": {
+        "i": 1,
+        "meaning": "end device"
+       },
+       "ssp_target_port": 1,
+       "attached_sas_address": 5764621945736650815,
+       "sas_address": 5764621945736650761,
+       "phy_index": 0
+      }
+     ]
+    }
+   },
+   {
+    "element_type": {
+     "i": 1,
+     "meaning": "Device slot"
+    },
+    "descriptor": "",
+    "element_number": 2,
+    "overall": 0,
+    "individual": true,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 1,
+      "meaning": "OK"
+     },
+     "fault_sensed": 0,
+     "fault_reqstd": 0,
+     "ident": 0
+    },
+    "additional_element_status_descriptor": {
+     "descriptor_type": 0,
+     "number_of_phy_descriptors": 1,
+     "not_all_phys": 0,
+     "device_slot_number": 2,
+     "phy_descriptor_list": [
+      {
+       "device_type": {
+        "i": 1,
+        "meaning": "end device"
+       },
+       "ssp_target_port": 1,
+       "attached_sas_address": 5764621945736650815,
+       "sas_address": 5764621945736650762,
+       "phy_index": 0
+      }
+     ]
+    }
+   },
+   {
+    "element_type": {
+     "i": 1,
+     "meaning": "Device slot"
+    },
+    "descriptor": "",
+    "element_number": 3,
+    "overall": 0,
+    "individual": true,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 1,
+      "meaning": "OK"
+     },
+     "fault_sensed": 0,
+     "fault_reqstd": 0,
+     "ident": 0
+    },
+    "additional_element_status_descriptor": {
+     "descriptor_type": 0,
+     "number_of_phy_descriptors": 1,
+     "not_all_phys": 0,
+     "device_slot_number": 3,
+     "phy_descriptor_list": [
+      {
+       "device_type": {
+        "i": 1,
+        "meaning": "end device"
+       },
+       "ssp_target_port": 1,
+       "attached_sas_address": 5764621945736650815,
+       "sas_address": 5764621945736650763,
+       "phy_index": 0
+      }
+     ]
+    }
+   },
+   {
+    "element_type": {
+     "i": 1,
+     "meaning": "Device slot"
+    },
+    "descriptor": "",
+    "element_number": 4,
+    "overall": 0,
+    "individual": true,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 5,
+      "meaning": "Not installed"
+     },
+     "fault_sensed": 0,
+     "fault_reqstd": 0,
+     "ident": 0
+    },
+    "additional_element_status_descriptor": {
+     "descriptor_type": 0,
+     "number_of_phy_descriptors": 1,
+     "not_all_phys": 0,
+     "device_slot_number": 4,
+     "phy_descriptor_list": [
+      {
+       "device_type": {
+        "i": 1,
+        "meaning": "end device"
+       },
+       "ssp_target_port": 1,
+       "attached_sas_address": 5764621945736650815,
+       "sas_address": 0,
+       "phy_index": 0
+      }
+     ]
+    }
+   },
+   {
+    "element_type": {
+     "i": 1,
+     "meaning": "Device slot"
+    },
+    "descriptor": "",
+    "element_number": 5,
+    "overall": 0,
+    "individual": true,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 5,
+      "meaning": "Not installed"
+     },
+     "fault_sensed": 0,
+     "fault_reqstd": 0,
+     "ident": 0
+    },
+    "additional_element_status_descriptor": {
+     "descriptor_type": 0,
+     "number_of_phy_descriptors": 1,
+     "not_all_phys": 0,
+     "device_slot_number": 5,
+     "phy_descriptor_list": [
+      {
+       "device_type": {
+        "i": 1,
+        "meaning": "end device"
+       },
+       "ssp_target_port": 1,
+       "attached_sas_address": 5764621945736650815,
+       "sas_address": 0,
+       "phy_index": 0
+      }
+     ]
+    }
+   },
+   {
+    "element_type": {
+     "i": 1,
+     "meaning": "Device slot"
+    },
+    "descriptor": "",
+    "element_number": 6,
+    "overall": 0,
+    "individual": true,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 5,
+      "meaning": "Not installed"
+     },
+     "fault_sensed": 0,
+     "fault_reqstd": 0,
+     "ident": 0
+    },
+    "additional_element_status_descriptor": {
+     "descriptor_type": 0,
+     "number_of_phy_descriptors": 1,
+     "not_all_phys": 0,
+     "device_slot_number": 6,
+     "phy_descriptor_list": [
+      {
+       "device_type": {
+        "i": 1,
+        "meaning": "end device"
+       },
+       "ssp_target_port": 1,
+       "attached_sas_address": 5764621945736650815,
+       "sas_address": 0,
+       "phy_index": 0
+      }
+     ]
+    }
+   },
+   {
+    "element_type": {
+     "i": 1,
+     "meaning": "Device slot"
+    },
+    "descriptor": "",
+    "element_number": 7,
+    "overall": 0,
+    "individual": true,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 5,
+      "meaning": "Not installed"
+     },
+     "fault_sensed": 0,
+     "fault_reqstd": 0,
+     "ident": 0
+    },
+    "additional_element_status_descriptor": {
+     "descriptor_type": 0,
+     "number_of_phy_descriptors": 1,
+     "not_all_phys": 0,
+     "device_slot_number": 7,
+     "phy_descriptor_list": [
+      {
+       "device_type": {
+        "i": 1,
+        "meaning": "end device"
+       },
+       "ssp_target_port": 1,
+       "attached_sas_address": 5764621945736650815,
+       "sas_address": 0,
+       "phy_index": 0
+      }
+     ]
+    }
+   },
+   {
+    "element_type": {
+     "i": 2,
+     "meaning": "Power supply"
+    },
+    "descriptor": "",
+    "element_number": -1,
+    "overall": 1,
+    "individual": false,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 0,
+      "meaning": "Unsupported"
+     }
+    }
+   },
+   {
+    "element_type": {
+     "i": 2,
+     "meaning": "Power supply"
+    },
+    "descriptor": "",
+    "element_number": 0,
+    "overall": 0,
+    "individual": true,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 0,
+      "meaning": "Unsupported"
+     },
+     "dc_over_voltage": 1,
+     "dc_under_voltage": 0,
+     "dc_over_current": 1,
+     "fail": 0,
+     "off": 0,
+     "overtmp_fail": 0,
+     "temp_warn": 0,
+     "ac_fail": 0,
+     "dc_fail": 0
+    }
+   },
+   {
+    "element_type": {
+     "i": 4,
+     "meaning": "Temperature sensor"
+    },
+    "descriptor": "",
+    "element_number": -1,
+    "overall": 1,
+    "individual": false,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 0,
+      "meaning": "Unsupported"
+     }
+    }
+   },
+   {
+    "element_type": {
+     "i": 4,
+     "meaning": "Temperature sensor"
+    },
+    "descriptor": "",
+    "element_number": 0,
+    "overall": 0,
+    "individual": true,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 1,
+      "meaning": "OK"
+     },
+     "temperature": {
+      "i": 68,
+      "meaning": "48 C"
+     },
+     "ot_failure": 0,
+     "ot_warning": 0,
+     "ut_failure": 0,
+     "ut_warning": 0,
+     "fail": 0
+    }
+   },
+   {
+    "element_type": {
+     "i": 14,
+     "meaning": "Enclosure"
+    },
+    "descriptor": "",
+    "element_number": -1,
+    "overall": 1,
+    "individual": false,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 0,
+      "meaning": "Unsupported"
+     }
+    }
+   },
+   {
+    "element_type": {
+     "i": 14,
+     "meaning": "Enclosure"
+    },
+    "descriptor": "",
+    "element_number": 0,
+    "overall": 0,
+    "individual": true,
+    "status_descriptor": {
+     "prdfail": 0,
+     "disabled": 0,
+     "swap": 0,
+     "status": {
+      "i": 1,
+      "meaning": "OK"
+     },
+     "failure_indication": 0,
+     "warning_indication": 0
+    }
+   }
+  ]
+ },
+ "exit_status": {
+  "i": 0,
+  "meaning": "no errors"
+ }
+}

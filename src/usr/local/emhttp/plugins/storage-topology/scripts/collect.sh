@@ -168,10 +168,12 @@ for e in /sys/class/sas_device/end_device-*; do
   echo "$n|$(cat "$e/sas_address" 2>/dev/null)|$(cat "$e/target_port_protocols" 2>/dev/null)|$(basename "$pp")|$phys|$hctl|$typ|$ven|$mdl|$blk"
 done >"$NEW/end_devices.txt" 2>/dev/null
 
+# SAS hosts: driver, board name, firmware and PCI address (the host's parent device), which matches a host to its
+# storcli controller.
 for h in /sys/class/sas_host/host*; do
   [ -d "$h" ] || continue
   s=/sys/class/scsi_host/${h##*/}
-  echo "${h##*/}|$(cat "$s/proc_name" 2>/dev/null)|$(cat "$s/board_name" 2>/dev/null)|$(cat "$s/version_fw" 2>/dev/null)"
+  echo "${h##*/}|$(cat "$s/proc_name" 2>/dev/null)|$(cat "$s/board_name" 2>/dev/null)|$(cat "$s/version_fw" 2>/dev/null)|$(basename "$(dirname "$(readlink -f "$s/device")")")"
 done >"$NEW/sas_hosts.txt" 2>/dev/null
 
 lsblk -dJ -o NAME,SERIAL,WWN,TRAN,MODEL,SIZE >"$NEW/lsblk.json" 2>/dev/null

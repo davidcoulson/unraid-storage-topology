@@ -1,0 +1,36 @@
+{
+ "blockdevices": [
+  {
+   "name": "sdb",
+   "serial": "ZCTEST3001",
+   "wwn": "0x5000c500c0000001",
+   "tran": "sas",
+   "model": "ST8000VN004-2M2101",
+   "size": "7.3T"
+  },
+  {
+   "name": "sdc",
+   "serial": "ZCTEST3002",
+   "wwn": "0x5000c500c0000002",
+   "tran": "sas",
+   "model": "ST8000VN004-2M2101",
+   "size": "7.3T"
+  },
+  {
+   "name": "sdd",
+   "serial": "ZCTEST3003",
+   "wwn": "0x5000c500c0000003",
+   "tran": "sas",
+   "model": "ST8000VN004-2M2101",
+   "size": "7.3T"
+  },
+  {
+   "name": "sde",
+   "serial": "ZCTEST3004",
+   "wwn": "0x5000c500c0000004",
+   "tran": "sas",
+   "model": "ST8000VN004-2M2101",
+   "size": "7.3T"
+  }
+ ]
+}

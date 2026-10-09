@@ -1,0 +1,44 @@
+{
+ "Controllers": [
+  {
+   "Command Status": {
+    "CLI Version": "007.3404.0000.0000 Aug 14, 2025",
+    "Operating system": "Linux 6.12.54-Unraid",
+    "Controller": 0,
+    "Status": "Success",
+    "Description": "None"
+   },
+   "Response Data": {
+    "Enclosure /c0/e2 ": {
+     "Information": {
+      "Device ID": 2,
+      "Position": 1,
+      "Status": "OK",
+      "EnclLogicalID": "0x50000D1E0C0DE03E"
+     },
+     "Inquiry Data": {
+      "Vendor Identification": "ADAPTEC ",
+      "Product Identification": "AEC-82885T",
+      "Product Revision Level": "0101"
+     },
+     "Properties": [
+      {
+       "EID": 2,
+       "State": "OK",
+       "Slots": 8,
+       "PD": 4,
+       "PS": 0,
+       "Fans": 0,
+       "TSs": 1,
+       "Alms": 0,
+       "SIM": 0,
+       "Port#": "-",
+       "ProdID": "AEC-82885T",
+       "VendorSpecific": ""
+      }
+     ]
+    }
+   }
+  }
+ ]
+}

@@ -20,6 +20,10 @@ Layouts:
                          element as on the DS424 IOM12) cabled with one cable to an IT-mode HBA: one SES device for
                          two I/O modules, the server sees only IOM A's expander. Two SATA drives: bay 0 with the
                          fault sensed by the shelf, bay 1 with the fault LED requested by host software.
+  it-mode-3008-partial-storcli
+                         OEM SAS3008 in IT mode with storcli, which reports no controller status and no PHYs for it;
+                         x4 with one cable to an expander card whose SES PSU element is Unsupported with junk DC
+                         over-voltage/over-current bits. Four SATA drives in its bays, one spun down.
 
 Not written here (real data, anonymised with include/anonymise.php, kept as they are):
   netapp-ds424-pages     NetApp DS424 IOM12: sg_ses --json --join and pages 1, 2, 7 and 0Ah from the same shelf, to
@@ -526,8 +530,79 @@ def netapp_single_path():
     k.files(d)
 
 
+def oem_3008_expander_card():
+    """OEM SAS3008 in IT mode (Inspur 9300-8i style) with storcli installed: storcli's controller has no Controller
+    Status and no PHY data. x4 to an expander card (Adaptec AEC-82885T style) whose SES device has a PSU element with
+    status Unsupported and junk DC over-voltage/over-current bits, cabled with one cable. A disk is spun down, so
+    storcli gave the brief drive list."""
+    d = os.path.join(ROOT, 'it-mode-3008-partial-storcli')
+    hba = 0x500605b0c0de0000
+    k = Kernel(0, 8, hba)
+    exp_sas = 0x50000d1e0c0de03f
+    product = 'AEC-82885T'
+    x = k.expander([0, 1, 2, 3], exp_sas, product, 36, '12.0 Gbit', '12.0 Gbit', vendor='ADAPTEC')
+    ses_hctl = k.behind(x, 35, exp_sas - 1, 'ssp', 13, 'ADAPTEC', product, '')
+    lss = lsscsi_line(ses_hctl, 'enclosu', 'ADAPTEC', product, '0101', '-', '/dev/sg12')
+    enc_id = 0x50000d1e0c0de03e
+    model = 'ST8000VN004-2M2101'
+    blk, disks, bays, rows = [], [], '', []
+    els = [element(1, 'Device slot', -1, 'Unsupported')]
+    for b in range(8):
+        if b < 4:
+            dev = 'sd' + 'bcde'[b]
+            sas = 0x50000d1e0c0de000 + 8 + b
+            hctl = k.behind(x, 8 + b, sas, 'sata', 0, 'ATA', model, dev)
+            lss += lsscsi_line(hctl, 'disk', 'ATA', 'ST8000VN004-2M21', 'SC60', f'/dev/{dev}', f'/dev/sg{b}')
+            blk.append((dev, f'ZCTEST30{b + 1:02d}', f'0x5000c500c000{b + 1:04x}', 'sas', model, '7.3T'))
+            disks.append((f'disk{b + 1}', {'name': f'disk{b + 1}', 'device': dev, 'type': 'Data', 'status': 'DISK_OK',
+                                           'spundown': '1' if b == 3 else '0', 'temp': '*' if b == 3 else '33'}))
+            bays += f'{ses_hctl}|0x{enc_id:016x}|{b}|{b}|OK|0|0|{dev}\n'
+            els.append(element(1, 'Device slot', b, 'OK', fault_sensed=0, fault_reqstd=0, ident=0, aes=slot_aes(b, sas, exp_sas)))
+            rows.append({'EID:Slt': f'2:{b}', 'DID': 10 + b, 'State': 'JBOD', 'DG': '-', 'Size': '7.276 TB', 'Intf': 'SATA',
+                         'Med': 'HDD', 'SED': 'N', 'PI': 'N', 'SeSz': '512B', 'Model': model, 'Sp': 'D' if b == 3 else 'U', 'Type': '-'})
+        else:
+            bays += f'{ses_hctl}|0x{enc_id:016x}|{b}|{b}|not installed|0|0|\n'
+            els.append(element(1, 'Device slot', b, 'Not installed', fault_sensed=0, fault_reqstd=0, ident=0, aes=slot_aes(b, 0, exp_sas)))
+    # The card has no power supply; its PSU element says Unsupported but carries over-voltage/over-current bits.
+    els += [element(2, 'Power supply', -1, 'Unsupported'), psu(0, 'Unsupported', dc_over_voltage=1, dc_over_current=1)]
+    els += [element(4, 'Temperature sensor', -1, 'Unsupported'), temp(0, 48)]
+    els += [element(14, 'Enclosure', -1, 'Unsupported'), encl_el(0)]
+    cs = {'CLI Version': '007.3404.0000.0000 Aug 14, 2025', 'Operating system': 'Linux 6.12.54-Unraid', 'Controller': 0,
+          'Status': 'Success', 'Description': 'None'}
+    # No 'Status' section (Controller Status, Current Personality) and no PhyInfo: what this OEM firmware gives storcli.
+    ctrl = {'Controllers': [{'Command Status': cs, 'Response Data': {
+        'Basics': {'Controller': 0, 'Model': 'INSPUR 3008IT', 'Serial Number': 'SKTEST3008', 'SAS Address': f'{hba:016x}',
+                   'PCI Address': '00:01:00:00'},
+        'Version': {'Firmware Package Build': '00.00.00.00', 'Firmware Version': '16.00.12.00', 'Bios Version': '08.37.00.00_14.00.00.00',
+                    'Driver Name': 'mpt3sas', 'Driver Version': '54.100.00.00'},
+        'HwCfg': {'ROC temperature(Degree Celsius)': 52}}}]}
+    phys = {'Controllers': [{'Command Status': cs, 'Response Data': {}}]}
+    encl = {'Controllers': [{'Command Status': cs, 'Response Data': {'Enclosure /c0/e2 ': {
+        'Information': {'Device ID': 2, 'Position': 1, 'Status': 'OK', 'EnclLogicalID': f'0x{enc_id:016X}'},
+        'Inquiry Data': {'Vendor Identification': 'ADAPTEC ', 'Product Identification': product, 'Product Revision Level': '0101'},
+        'Properties': [{'EID': 2, 'State': 'OK', 'Slots': 8, 'PD': 4, 'PS': 0, 'Fans': 0, 'TSs': 1, 'Alms': 0, 'SIM': 0,
+                        'Port#': '-', 'ProdID': product, 'VendorSpecific': ''}]}}}]}
+    drives = {'Controllers': [{'Command Status': cs, 'Response Data': {'Drive Information': rows}}]}
+    noencl = {'Controllers': [{'Command Status': dict(cs, Status='Failure', Description='No drive found!'), 'Response Data': {}}]}
+    common(d, 'ctrl.json|0|980\nphys.json|0|410\nencl.json|0|450\ndrives.json|0|520\ndrives_noencl.json|0|400\nses_sg12.json|0|60\n',
+           '/usr/sbin/storcli64')
+    for n, j in [('ctrl.json', ctrl), ('phys.json', phys), ('encl.json', encl), ('drives.json', drives), ('drives_noencl.json', noencl)]:
+        write(d, n, json.dumps(j, indent=1) + '\n')
+    write(d, 'drives.skipped', '1\n')
+    write(d, 'ses_sg12.json', ses_json(els))
+    write(d, 'lsscsi.txt', lss)
+    write(d, 'enclosure_sysfs.txt', bays)
+    write(d, 'sas_hosts.txt', 'host0|mpt3sas|"INSPUR 3008IT"|16.00.12.00|0000:01:00.0\n')
+    write(d, 'scsi_hosts.txt', 'host0|mpt3sas\nhost1|ahci\n')
+    write(d, 'lsblk.json', lsblk(blk))
+    write(d, 'disks.ini', ini(disks))
+    write(d, 'devs.ini', '')
+    k.files(d)
+
+
 GENERATED = ['it-mode-sas3224', 'usb-short-ses', 'hba-wide-8', 'hba-wide-4-c1-unused', 'hba-partial-c1',
-             'hba-dual-expander', 'storcli-direct', 'emc-ktn-stl3', 'emc-ktn-stl3-pages', 'netapp-single-path']
+             'hba-dual-expander', 'storcli-direct', 'emc-ktn-stl3', 'emc-ktn-stl3-pages', 'netapp-single-path',
+             'it-mode-3008-partial-storcli']
 
 
 def main():
@@ -545,6 +620,7 @@ def main():
     storcli_direct()
     emc()
     netapp_single_path()
+    oem_3008_expander_card()
 
 
 if __name__ == '__main__':

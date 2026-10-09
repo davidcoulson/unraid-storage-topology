@@ -1,0 +1,5 @@
+[0:0:0:0]    enclosu ADAPTEC  AEC-82885T       0101  -          /dev/sg12
+[0:0:1:0]    disk    ATA      ST8000VN004-2M21 SC60  /dev/sdb   /dev/sg0
+[0:0:2:0]    disk    ATA      ST8000VN004-2M21 SC60  /dev/sdc   /dev/sg1
+[0:0:3:0]    disk    ATA      ST8000VN004-2M21 SC60  /dev/sdd   /dev/sg2
+[0:0:4:0]    disk    ATA      ST8000VN004-2M21 SC60  /dev/sde   /dev/sg3

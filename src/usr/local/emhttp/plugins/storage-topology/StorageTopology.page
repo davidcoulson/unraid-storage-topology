@@ -70,10 +70,10 @@ tr.st-dim td{opacity:.55}
 <?=st_problems_html($m, 'storage')?>
 
 <?foreach ($m['controllers'] as $c):
-  $cl = $c['status'] === 'Optimal' ? 'ok' : 'crit';
+  $cl = $c['status'] === 'Optimal' ? 'ok' : ($c['status'] === '' ? 'unknown' : 'crit');
 ?>
 <div class="st-card">
-<h3><i class="fa fa-microchip"></i> <?=$h($c['model'])?> <span class="st-dim">c<?=$c['id']?></span> <?=$chip($cl, $h($c['status']))?></h3>
+<h3><i class="fa fa-microchip"></i> <?=$h($c['model'])?> <span class="st-dim">c<?=$c['id']?></span> <?=$chip($cl, $c['status'] !== '' ? $h($c['status']) : 'not reported', $c['status'] !== '' ? '' : 'storcli did not report a controller status')?></h3>
 <div class="st-kv">
 <?foreach (['Serial' => $c['serial'], ($c['fw_package'] !== '' ? 'Firmware package' : 'Firmware') => $c['fw_package'] !== '' ? "{$c['fw_package']} ({$c['fw']})" : $c['fw'],
              'BIOS' => $c['bios'], 'Driver' => $c['driver'], 'Mode' => $c['personality']] as $k => $v) if ((string)$v !== '') echo "<div><span>{$h($k)}</span>{$h($v)}</div>\n";?>
@@ -95,6 +95,7 @@ tr.st-dim td{opacity:.55}
 <td><?=$h($p['attached_label'])?> <span class="st-dim"><?=$h($p['type'])?></span></td><td class="st-dim"><?=$h($p['attached'])?></td></tr>
 <?endforeach;?>
 </table>
+<?if (!empty($c['kernel_ports'])):?><p class="st-dim" style="margin:2px 0">From the kernel's view: storcli reported no ports for this controller.</p><?endif;?>
 <?if ($c['connectors']):
   $unused = [];
   foreach ($c['connectors'] as $g) {
@@ -190,7 +191,7 @@ if ($g['psu'] || $g['fan'] || $g['volt'] || $g['amp']):?>
 <table class="st">
 <tr><th>PSU</th><th>Status</th><th>Firmware</th><th>Part</th><th>Serial</th><th>Rating</th><?if ($paired):?><th>Fans</th><th>Voltages</th><th>Currents</th><?endif;?></tr>
 <?foreach ($g['psu'] as $n => $x):?>
-<tr<?=$x['level'] === 'absent' ? ' class="st-dim"' : ''?>><td><?=$x['name'] !== '' ? $h(topo_short_name($x['name'])) : 'PSU ' . ($n + 1)?></td><td><?=$chip($x['level'], $h($x['status']) . ($x['flags'] ? ' (' . $h(implode(', ', $x['flags'])) . ')' : ''))?></td>
+<tr<?=$x['level'] === 'absent' ? ' class="st-dim"' : ''?>><td><?=$x['name'] !== '' ? $h(topo_short_name($x['name'])) : 'PSU ' . ($n + 1)?></td><td><?=$chip($x['level'], $h($x['status']) . ($x['flags'] && $x['level'] !== 'unknown' ? ' (' . $h(implode(', ', $x['flags'])) . ')' : ''))?></td>
 <td><?=$h($x['fw'])?></td><td><?=$h($x['pn'])?></td><td><?=$h($x['kv']['SN'] ?? '')?></td><td><?=isset($x['kv']['PW']) ? $h($x['kv']['PW']) . ' W' : ''?></td>
 <?if ($paired):?>
 <td><?foreach ([2 * $n, 2 * $n + 1] as $f) echo $chip($g['fan'][$f]['level'], $g['fan'][$f]['rpm'] . ' rpm', $g['fan'][$f]['code']) . ' ';?></td>

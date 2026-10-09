@@ -300,6 +300,53 @@ t($sp(true, []) === 'multi' && $sp(false, [$drv(false, 'Active')]) === 'single' 
   && $sp(false, [$drv(true, 'Active')]) === 'multi' && $sp(false, []) === 'single', 'storcli: Multipath enclosure or a drive with two paths is multipath, else single');
 
 // ---------------------------------------------------------------------------------------------------------
+$section = 'it-mode-3008-partial-storcli';
+$dir = "$fx/it-mode-3008-partial-storcli";
+$m = load($dir);
+$c = $m['controllers'][0] ?? null;
+t(count($m['controllers']) === 1 && $c['model'] === 'INSPUR 3008IT' && empty($c['sysfs']), 'one controller, from storcli (the kernel host is the same HBA)');
+t($c['status'] === '' && !matching($m, '/status/', 'crit') && !array_filter($m['problems'], fn($p) => $p['level'] === 'crit'), 'missing Controller Status is not critical: ' . dump_problems($m));
+$part = matching($m, '/^Controller c0: storcli returned only partial data for it \(no controller status, no port data\), as it does with some OEM and IT-mode firmware; its ports are shown from the kernel\'s view\.$/', 'info');
+t(count($part) === 1 && count(matching($m, '/^Controller c0/')) === 1, 'one note for the controller: ' . dump_problems($m));
+t(!empty($c['kernel_ports']) && count($c['ports']) === 1 && $c['ports'][0]['phys'] === [0, 1, 2, 3] && $c['ports'][0]['expander'], 'ports filled from the kernel: one x4 port to the expander');
+t(($c['ports'][0]['attached_label'] ?? '') === 'Shelf sg12 expander (AEC-82885T)' && !$c['ports'][0]['slow'], 'the port is cabled to the expander card, 12G of 12G: ' . ($c['ports'][0]['attached_label'] ?? '-'));
+t(($c['ports'][0]['connectors'] ?? []) === ['C0'] && ($c['connectors'][1]['level'] ?? '') === 'absent' && $c['unused_phys'] === 4, 'C0 linked, C1 unused');
+t(($m['hphy_port']['phy-0:0'] ?? '') === 'HBA c0 port 0', 'kernel PHYs named after the storcli controller');
+t(!matching($m, '/PSU/'), 'PSU element with status Unsupported: its over-voltage/over-current bits are not a problem');
+$s = $m['shelves'][topo_addr('0x50000d1e0c0de03e')] ?? null;
+t($s && $s['label'] === 'Shelf sg12' && $s['eid'] === 2 && $s['paths'] === 'single' && count($s['drives']) === 4, 'expander card matched to storcli e2, single path, 4 drives in bays');
+t(count(matching($m, '/^Shelf sg12: single path to the controller \(one cable; normal unless this enclosure has a second module you meant to cable\)$/', 'info')) === 1, 'single path is a note');
+t($m['level'] === 'info' && !array_filter($m['problems'], fn($p) => $p['level'] === 'warn'), 'only notes: ' . dump_problems($m));
+// Matched by PCI address when the SAS addresses differ.
+$d2 = "$tmp/3008-pci";
+copy_dir($dir, $d2);
+file_put_contents("$d2/ctrl.json", str_replace('500605b0c0de0000', '500605b0c0de1111', file_get_contents("$d2/ctrl.json")));
+$m2 = load($d2);
+t(count($m2['controllers']) === 1 && !empty($m2['controllers'][0]['kernel_ports']), 'matched by PCI address (00:01:00:00 = 0000:01:00.0)');
+t(topo_pci('00:01:00:00') === '01:00.0' && topo_pci('0000:2b:00.0') === '2b:00.0' && topo_pci('0000:2B:00.1') === topo_pci('00:2b:00:01') && topo_pci('') === '', 'PCI addresses compared in one form');
+// A real status from storcli is still raised; ports storcli does report are kept.
+$d3 = "$tmp/3008-degraded";
+copy_dir($dir, $d3);
+$j = json_decode(file_get_contents("$d3/ctrl.json"), true);
+$j['Controllers'][0]['Response Data']['Status'] = ['Controller Status' => 'Needs Attention'];
+file_put_contents("$d3/ctrl.json", json_encode($j));
+$phy = fn($n) => ['PhyNo' => $n, 'SAS_Addr' => '0x50000d1e0c0de03f', 'Link_Speed' => '12.0Gb/s', 'Device_Type' => 'Expander', 'Port' => 0, 'Port_valid' => 1, 'MaxSpeed' => '12.0Gb/s'];
+file_put_contents("$d3/phys.json", json_encode(['Controllers' => [['Command Status' => ['Controller' => 0, 'Status' => 'Success'], 'Response Data' => ['PhyInfo' => array_map($phy, [0, 1, 2, 3])]]]]));
+$m3 = load($d3);
+t(count(matching($m3, '/^Controller c0 status: Needs Attention$/', 'crit')) === 1 && !matching($m3, '/partial data/'), 'a reported non-Optimal status is critical, no partial-data note: ' . dump_problems($m3));
+t(empty($m3['controllers'][0]['kernel_ports']) && count($m3['controllers'][0]['ports']) === 1, 'ports from storcli when it has them');
+// Flags on a PSU that reports a real status are still a problem.
+$d4 = "$tmp/3008-psu-ok";
+copy_dir($dir, $d4);
+$j = json_decode(file_get_contents("$d4/ses_sg12.json"), true);
+foreach ($j['join_of_diagnostic_pages']['element_list'] as &$e) if ($e['element_type']['i'] === 2 && $e['element_number'] === 0) $e['status_descriptor']['status'] = ['i' => 1, 'meaning' => 'OK'];
+unset($e);
+file_put_contents("$d4/ses_sg12.json", json_encode($j));
+t(count(matching(load($d4), '/^Shelf sg12 PSU 1: DC over-voltage, DC over-current$/', 'warn')) === 1, 'PSU with status OK and the same bits: warning');
+t(topo_psu_problem(['level' => 'unknown', 'status' => 'Unknown', 'flags' => ['ac_fail', 'off']]) === '' && topo_psu_problem(['level' => 'absent', 'status' => 'Not installed', 'flags' => ['off']]) === ''
+  && topo_psu_problem(['level' => 'crit', 'status' => 'Critical', 'flags' => ['ac_fail', 'off']]) !== '', 'PSU flags ignored only for unknown and absent levels');
+
+// ---------------------------------------------------------------------------------------------------------
 $section = 'anonymise';
 $d2 = "$tmp/anon";
 copy_dir("$fx/it-mode-sas3224", $d2);
@@ -368,6 +415,8 @@ foreach (glob("$fx/*", GLOB_ONLYDIR) as $d) {
     && str_contains($html, 'Clear with: sg_ses --dev-slot-num=1 --clear=fault /dev/sg2')
     && preg_match('/st-bay warn" title="[^"]*fault sensed[^"]*"><span class="n">0</', $html)
     && preg_match('/st-bay info" title="[^"]*fault requested[^"]*"><span class="n">1</', $html), 'netapp-single-path page: bays show which fault bit');
+  if ($name === 'it-mode-3008-partial-storcli') t(str_contains($html, '>not reported</span>') && str_contains($html, 'From the kernel\'s view: storcli reported no ports for this controller.')
+    && str_contains($html, 'Shelf sg12 expander (AEC-82885T)') && !str_contains($html, 'dc_over_voltage'), '3008 page: status not reported, ports from the kernel, no PSU flags');
   if ($name === 'it-mode-sas3224') t(str_contains($html, 'Directly attached drives') && !str_contains($html, 'SN &middot;') && !str_contains($html, 'I/O modules'), 'it-mode page: direct table, no empty serial or IOM table');
 }
 

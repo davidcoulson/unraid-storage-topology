@@ -1,0 +1,32 @@
+{
+ "Controllers": [
+  {
+   "Command Status": {
+    "CLI Version": "007.3404.0000.0000 Aug 14, 2025",
+    "Operating system": "Linux 6.12.54-Unraid",
+    "Controller": 0,
+    "Status": "Success",
+    "Description": "None"
+   },
+   "Response Data": {
+    "Basics": {
+     "Controller": 0,
+     "Model": "INSPUR 3008IT",
+     "Serial Number": "SKTEST3008",
+     "SAS Address": "500605b0c0de0000",
+     "PCI Address": "00:01:00:00"
+    },
+    "Version": {
+     "Firmware Package Build": "00.00.00.00",
+     "Firmware Version": "16.00.12.00",
+     "Bios Version": "08.37.00.00_14.00.00.00",
+     "Driver Name": "mpt3sas",
+     "Driver Version": "54.100.00.00"
+    },
+    "HwCfg": {
+     "ROC temperature(Degree Celsius)": 52
+    }
+   }
+  }
+ ]
+}

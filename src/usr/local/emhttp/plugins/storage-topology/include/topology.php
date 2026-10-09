@@ -303,11 +303,13 @@ function topo_controllers(string $dir, array &$m, array &$labels): void {
       $addr = strtoupper(str_pad(dechex(hexdec(substr($sas, -4)) + $pn), 4, '0', STR_PAD_LEFT));
       $labels[substr($sas, 0, -4) . $addr] = "HBA c$id port $pn";
     }
+    // Some OEM and IT-mode firmware (e.g. Inspur's SAS3008 IT) gives storcli no controller status and no PHY data:
+    // the status is then '' (not reported, not a fault) and topo_sysfs_hba fills the ports from the kernel's view.
     $m['controllers'][] = [
       'id' => $id, 'model' => $b['Model'] ?? '?', 'serial' => $b['Serial Number'] ?? '', 'sas' => $sas,
       'pci' => $b['PCI Address'] ?? '', 'fw_package' => $v['Firmware Package Build'] ?? '', 'fw' => $v['Firmware Version'] ?? '',
       'bios' => $v['Bios Version'] ?? '', 'driver' => trim(($v['Driver Name'] ?? '') . ' ' . ($v['Driver Version'] ?? '')),
-      'status' => $s['Controller Status'] ?? '?', 'personality' => trim($s['Current Personality'] ?? ''),
+      'status' => trim((string)($s['Controller Status'] ?? '')), 'no_phy_data' => !($physBy[$id] ?? []), 'personality' => trim($s['Current Personality'] ?? ''),
       'roc_temp' => $hw['ROC temperature(Degree Celsius)'] ?? null, 'memory' => $hw['On Board Memory Size'] ?? '',
       'pending_fw' => $r['Pending Images in Flash'] ?? null, 'cli' => $c['Command Status']['CLI Version'] ?? '',
       'ports' => array_values($ports), 'phy_list' => $phyList, 'unused_phys' => count(array_filter($phyList, fn($x) => $x['port'] === null)),
@@ -723,49 +725,45 @@ function topo_simple_enclosure(string $dir, array $m, array $k, array $names, st
           'groups' => $g, 'disks' => array_values($disks), 'bays' => $bays, 'disk_source' => $source];
 }
 
+// PCI address in one form for both sources: storcli "00:01:00:00" and sysfs "0000:01:00.0" -> "01:00.0"; '' if neither.
+function topo_pci(string $a): string {
+  $a = trim($a);
+  if (preg_match('/^[0-9a-f]{1,4}:([0-9a-f]{1,2}):([0-9a-f]{1,2})[:.]([0-9a-f]{1,2})$/i', $a, $mm))
+    return sprintf('%02x:%02x.%x', hexdec($mm[1]), hexdec($mm[2]), hexdec($mm[3]));
+  return '';
+}
+
 // Without storcli (e.g. an LSI HBA in IT mode on mpt3sas), describe each SAS HBA from the kernel's sas_phy data.
+// HBAs storcli describes (same SAS or PCI address) are skipped, except that one storcli gave no ports gets them from here.
 function topo_sysfs_hba(string $dir, array &$m, array &$labels, array $k, array $names): void {
   $hosts = [];
   foreach (@file("$dir/sas_hosts.txt", FILE_IGNORE_NEW_LINES) ?: [] as $l) {
-    [$h, $driver, $board, $fw] = array_pad(explode('|', $l), 4, '');
-    $hosts[$h] = ['driver' => trim($driver), 'board' => trim($board, " \t\""), 'fw' => trim($fw)];
+    [$h, $driver, $board, $fw, $pci] = array_pad(explode('|', $l), 5, '');
+    $hosts[$h] = ['driver' => trim($driver), 'board' => trim($board, " \t\""), 'fw' => trim($fw), 'pci' => topo_pci($pci)];
   }
   $byHost = [];
   foreach ($k['hphy'] as $p) $byHost[$p['host']][$p['n']] = $p;
   ksort($byHost);
-  $known = array_filter(array_column($m['controllers'], 'sas'));
   foreach ($byHost as $h => $phys) {
     ksort($phys);
     $hi = $hosts["host$h"] ?? [];
     if (($hi['driver'] ?? '') === 'megaraid_sas') continue;   // megaraid hides its SAS layer; storcli is needed there
     $sas = reset($phys)['sas'] ?? '';
-    if ($sas !== '' && in_array($sas, $known, true)) continue;   // already described by storcli
-    $ports = []; $phyList = [];
-    foreach ($phys as $p) {
-      if ($p['port'] === '') { $phyList[$p['n']] = ['rate' => 0.0, 'port' => null]; continue; }
-      [$attName, $attAddr] = array_pad(explode('=', $p['att'], 2), 2, '');
-      // A port attached to its own address is a virtual management endpoint (e.g. a PCIe switch card's SES), not a cable.
-      if (topo_addr($attAddr) === $p['sas']) continue;
-      if (!isset($ports[$p['port']])) {
-        $isExp = str_starts_with($attName, 'expander');
-        $end = $k['end'][$attName] ?? null;
-        $type = $isExp ? 'Expander' : ($attName ? 'End device' . ($end ? ($end['sata'] ? ' (SATA)' : ' (SAS)') : '') : '');
-        $remote = $isExp ? topo_exp_max($k, $attName) : ($end && $end['sata'] ? TOPO_SATA_MAX : 0.0);
-        $ports[$p['port']] = ['port' => count($ports), 'phys' => [], 'rates' => [], 'attached' => topo_addr($attAddr), 'type' => $type,
-                              'expander' => $isExp, 'att_name' => $attName, 'local_max' => 0.0, 'remote_max' => $remote,
-                              'remote_what' => $isExp ? 'expander' : ($end && $end['sata'] ? 'SATA drive' : '')];
-        if ($isExp && ($e = $k['exp'][$attName] ?? null) && $e['product']) $ports[$p['port']]['type'] .= " ({$e['product']})";
-        // A drive straight on the HBA: label the port with the disk instead of a bare SAS address.
-        if ($end && $end['block'] !== '') $labels[topo_addr($attAddr)] = topo_disk_label(topo_by_dev($names, $end['block']), $end['block']);
-      }
-      $pt = &$ports[$p['port']];
-      $pt['phys'][] = $p['n'];
-      $pt['rates'][] = $p['rate'];
-      $cap = $p['max_hw'] ?: $p['max'];
-      if ($cap) $pt['local_max'] = $pt['local_max'] ? min($pt['local_max'], $cap) : $cap;
-      unset($pt);
-      $phyList[$p['n']] = ['rate' => $p['rate'], 'port' => $ports[$p['port']]['port']];
+    $ci = null;
+    foreach ($m['controllers'] as $i => $c)
+      if (empty($c['sysfs']) && (($sas !== '' && $c['sas'] === $sas) || (($hi['pci'] ?? '') !== '' && topo_pci($c['pci']) === $hi['pci']))) $ci = $i;
+    if ($ci !== null) {                                           // already described by storcli
+      if ($m['controllers'][$ci]['ports']) continue;
+      [$ports, $phyList] = topo_kernel_ports($k, $phys, $labels, $names);
+      if (!$ports) continue;
+      $c = &$m['controllers'][$ci];
+      foreach ($ports as $pt) foreach ($pt['phys'] as $n) $m['hphy_port']["phy-$h:$n"] = "HBA c{$c['id']} port {$pt['port']}";
+      $c['ports'] = array_values($ports); $c['phy_list'] = $phyList; $c['kernel_ports'] = true;
+      $c['unused_phys'] = count(array_filter($phyList, fn($x) => $x['port'] === null));
+      unset($c);
+      continue;
     }
+    [$ports, $phyList] = topo_kernel_ports($k, $phys, $labels, $names);
     if (!$ports) continue;
     foreach ($ports as $pt) foreach ($pt['phys'] as $n) $m['hphy_port']["phy-$h:$n"] = "HBA c$h port {$pt['port']}";
     $m['controllers'][] = [
@@ -776,6 +774,37 @@ function topo_sysfs_hba(string $dir, array &$m, array &$labels, array $k, array 
       'encl' => [], 'connector_names' => [], 'sysfs' => true,
     ];
   }
+}
+
+// One SAS host's ports from its kernel PHYs (sas_phy, sas_port): [ports keyed by sas_port, PHY number => rate and port].
+function topo_kernel_ports(array $k, array $phys, array &$labels, array $names): array {
+  $ports = []; $phyList = [];
+  foreach ($phys as $p) {
+    if ($p['port'] === '') { $phyList[$p['n']] = ['rate' => 0.0, 'port' => null]; continue; }
+    [$attName, $attAddr] = array_pad(explode('=', $p['att'], 2), 2, '');
+    // A port attached to its own address is a virtual management endpoint (e.g. a PCIe switch card's SES), not a cable.
+    if (topo_addr($attAddr) === $p['sas']) continue;
+    if (!isset($ports[$p['port']])) {
+      $isExp = str_starts_with($attName, 'expander');
+      $end = $k['end'][$attName] ?? null;
+      $type = $isExp ? 'Expander' : ($attName ? 'End device' . ($end ? ($end['sata'] ? ' (SATA)' : ' (SAS)') : '') : '');
+      $remote = $isExp ? topo_exp_max($k, $attName) : ($end && $end['sata'] ? TOPO_SATA_MAX : 0.0);
+      $ports[$p['port']] = ['port' => count($ports), 'phys' => [], 'rates' => [], 'attached' => topo_addr($attAddr), 'type' => $type,
+                            'expander' => $isExp, 'att_name' => $attName, 'local_max' => 0.0, 'remote_max' => $remote,
+                            'remote_what' => $isExp ? 'expander' : ($end && $end['sata'] ? 'SATA drive' : '')];
+      if ($isExp && ($e = $k['exp'][$attName] ?? null) && $e['product']) $ports[$p['port']]['type'] .= " ({$e['product']})";
+      // A drive straight on the HBA: label the port with the disk instead of a bare SAS address.
+      if ($end && $end['block'] !== '') $labels[topo_addr($attAddr)] = topo_disk_label(topo_by_dev($names, $end['block']), $end['block']);
+    }
+    $pt = &$ports[$p['port']];
+    $pt['phys'][] = $p['n'];
+    $pt['rates'][] = $p['rate'];
+    $cap = $p['max_hw'] ?: $p['max'];
+    if ($cap) $pt['local_max'] = $pt['local_max'] ? min($pt['local_max'], $cap) : $cap;
+    unset($pt);
+    $phyList[$p['n']] = ['rate' => $p['rate'], 'port' => $ports[$p['port']]['port']];
+  }
+  return [$ports, $phyList];
 }
 
 // Bays of shelves storcli does not know: the kernel's enclosure driver links each bay to its disk.
@@ -978,7 +1007,9 @@ function topo_short_name(string $n): string {
 // A PSU's flags in words; '' when it has none worth a message.
 function topo_psu_problem(array $x): string {
   $f = array_flip($x['flags'] ?? []);
-  if ($x['level'] === 'absent') return '';
+  // Not installed, or a status of Unsupported/Unknown/Not available (e.g. the PSU element of an expander card that has
+  // no PSU): its flag bits mean nothing, as for fans in topo_problems.
+  if (in_array($x['level'], ['absent', 'unknown'], true)) return '';
   if (isset($f['ac_fail']) && (isset($f['off']) || isset($f['dc_fail']))) return 'no AC input (power cord unplugged or that feed is off)';
   $out = [];
   if (isset($f['ac_fail'])) $out[] = 'AC input failure';
@@ -1006,7 +1037,11 @@ function topo_problems(array &$m): void {
   if (!$m['detail']) $add('info', 'Per-drive detail skipped because a disk is spun down (this page never wakes drives).');
   foreach ($m['controllers'] as $c) {
     $cid = "c{$c['id']}";
-    if (!in_array($c['status'], ['Optimal'], true)) $add('crit', "Controller $cid status: {$c['status']}", "ctrl|$cid|status", $c['status']);
+    // A status storcli did not report ('') is unknown, not a fault: one note per controller covers it and missing ports.
+    if ($c['status'] !== '' && $c['status'] !== 'Optimal') $add('crit', "Controller $cid status: {$c['status']}", "ctrl|$cid|status", $c['status']);
+    $missing = array_keys(array_filter(['no controller status' => $c['status'] === '', 'no port data' => !empty($c['no_phy_data']) || !empty($c['kernel_ports'])]));
+    if ($missing) $add('info', "Controller $cid: storcli returned only partial data for it (" . implode(', ', $missing) . '), as it does with some OEM and IT-mode firmware'
+      . (!empty($c['kernel_ports']) ? "; its ports are shown from the kernel's view." : '.'), "ctrl|$cid|partial", implode(',', $missing));
     if ($c['roc_temp'] !== null && $c['roc_temp'] >= 95) $add('warn', "Controller $cid chip at {$c['roc_temp']} C", "ctrl|$cid|temp", '');
     foreach ($c['ports'] as $pt) {
       if (!$pt['slow']) continue;
@@ -1069,7 +1104,10 @@ function topo_problems(array &$m): void {
         elseif (!empty($x['fault_reqstd'])) $add('info', "{$s['label']} bay {$x['slot']}: fault LED turned on by host software (not a shelf-detected fault). Clear with: {$x['clear_cmd']}", "$ek|fault-reqstd", $x['clear_cmd']);
         if ($x['prdfail']) $add('warn', "{$s['label']} $what: predicted failure", "$ek|prdfail", '');
       }
-    if (!$s['multipath'] && $s['eid'] !== null && !$singlePath) $add('warn', "{$s['label']}: single path to the controller", "$sk|path", '');
+    // One cable to a shelf (or an expander card) is the usual setup, so it is a note. (The level is part of a problem's
+    // id, so acknowledgements of the earlier warning do not carry over to it.)
+    if (!$s['multipath'] && $s['eid'] !== null && !$singlePath)
+      $add('info', "{$s['label']}: single path to the controller (one cable; normal unless this enclosure has a second module you meant to cable)", "$sk|path", '');
   }
   if (count($ioms) > 1) {
     $parts = [];

@@ -95,7 +95,9 @@ The network page only runs `ethtool` queries (settings, `-i`, `-m`, `-S`, `-g`, 
   from `/sys/class/enclosure`. MegaRAID controllers hide their SAS layer from the kernel, so they need storcli.
   storcli also works with SAS3/SAS3.5 HBAs in IT mode (SAS3008, SAS3216/3224, SAS3408/3416 and later, e.g. 9300, 9305,
   9400, 9500 series); the page then shows the HBA's model, firmware and, on chips with a sensor (e.g. 9400/9500
-  series), its temperature. SAS2 HBAs (SAS2008/SAS2308, e.g. 9211-8i, 9207-8i, and their OEM versions) are not
+  series), its temperature. Some OEM IT-mode firmware (e.g. Inspur's SAS3008) gives storcli no controller status and
+  no port data: the status then shows as "not reported" (a note, not a fault) and the ports come from the kernel's
+  view. SAS2 HBAs (SAS2008/SAS2308, e.g. 9211-8i, 9207-8i, and their OEM versions) are not
   supported by storcli (it reports 0 controllers): the page shows them from the kernel view, and their chip
   temperature needs other tools; the plugin does not read it. lsiutil is not used.
 

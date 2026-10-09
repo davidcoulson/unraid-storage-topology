@@ -2,8 +2,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.13">
-<!ENTITY md5        "33ee4247e26df99c1870682f891d688d">
+<!ENTITY version    "2026.10.14">
+<!ENTITY md5        "3d334cad2314d5adad95798f42c85c4e">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
@@ -24,6 +24,16 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.14
+- Storage: a controller whose storcli data has no controller status (some OEM IT-mode firmware, e.g. Inspur's SAS3008)
+  is no longer critical. The status shows as "not reported", with one note that storcli returned only partial data for
+  that controller. When storcli also gives no ports for it, they are taken from the kernel's view of the same HBA
+  (matched by SAS or PCI address), so its ports, connectors and the cable to the expander show. A status that storcli
+  does report and that is not Optimal is still critical.
+- Storage: a PSU element whose status is Unsupported, Unknown or similar (e.g. on an expander card that has no power
+  supply) no longer raises its flag bits (such as DC over-voltage) as a warning, as for fans already.
+- Storage: "single path to the controller" is a note instead of a warning: one cable is the usual setup. It now says
+  so, and that a second path only matters if the enclosure has a second module you meant to cable.
 ###2026.10.13
 - Storage: a bay's two SES fault flags are told apart. "Fault sensed" (the shelf detected a problem) is a warning:
   check the drive and, for SATA drives, the interposer. "Fault requested" (host software turned the fault LED on, the

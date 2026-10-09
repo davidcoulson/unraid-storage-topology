@@ -1,0 +1,77 @@
+{
+ "Controllers": [
+  {
+   "Command Status": {
+    "CLI Version": "007.3404.0000.0000 Aug 14, 2025",
+    "Operating system": "Linux 6.12.54-Unraid",
+    "Controller": 0,
+    "Status": "Success",
+    "Description": "None"
+   },
+   "Response Data": {
+    "Drive Information": [
+     {
+      "EID:Slt": "2:0",
+      "DID": 10,
+      "State": "JBOD",
+      "DG": "-",
+      "Size": "7.276 TB",
+      "Intf": "SATA",
+      "Med": "HDD",
+      "SED": "N",
+      "PI": "N",
+      "SeSz": "512B",
+      "Model": "ST8000VN004-2M2101",
+      "Sp": "U",
+      "Type": "-"
+     },
+     {
+      "EID:Slt": "2:1",
+      "DID": 11,
+      "State": "JBOD",
+      "DG": "-",
+      "Size": "7.276 TB",
+      "Intf": "SATA",
+      "Med": "HDD",
+      "SED": "N",
+      "PI": "N",
+      "SeSz": "512B",
+      "Model": "ST8000VN004-2M2101",
+      "Sp": "U",
+      "Type": "-"
+     },
+     {
+      "EID:Slt": "2:2",
+      "DID": 12,
+      "State": "JBOD",
+      "DG": "-",
+      "Size": "7.276 TB",
+      "Intf": "SATA",
+      "Med": "HDD",
+      "SED": "N",
+      "PI": "N",
+      "SeSz": "512B",
+      "Model": "ST8000VN004-2M2101",
+      "Sp": "U",
+      "Type": "-"
+     },
+     {
+      "EID:Slt": "2:3",
+      "DID": 13,
+      "State": "JBOD",
+      "DG": "-",
+      "Size": "7.276 TB",
+      "Intf": "SATA",
+      "Med": "HDD",
+      "SED": "N",
+      "PI": "N",
+      "SeSz": "512B",
+      "Model": "ST8000VN004-2M2101",
+      "Sp": "D",
+      "Type": "-"
+     }
+    ]
+   }
+  }
+ ]
+}
