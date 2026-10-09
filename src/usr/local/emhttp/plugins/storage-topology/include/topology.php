@@ -31,6 +31,11 @@ function topo_trim_keys(array $a): array {
 }
 
 // "TP=9C;SN=ABC123;FW=0311;" -> [TP=>9C, SN=>ABC123, FW=>0311]. Empty values are dropped.
+// A fixed-width SES/SCSI identification string: some enclosures pad with NUL bytes, which sg_ses's JSON writes as "\x00".
+function topo_ses_str(string $s): string {
+  return trim(str_replace(['\\x00', "\0"], '', $s));
+}
+
 function topo_kv(string $s): array {
   $out = [];
   foreach (explode(';', $s) as $part) {
@@ -277,10 +282,15 @@ function topo_controllers(string $dir, array &$m, array &$labels): void {
   $phys = topo_json("$dir/phys.json");
   $physBy = [];
   foreach ($phys['Controllers'] ?? [] as $c) $physBy[$c['Command Status']['Controller'] ?? 0] = $c['Response Data']['PhyInfo'] ?? [];
+  $m['storcli_ran'] = !empty($ctrl['Controllers']);
   foreach ($ctrl['Controllers'] ?? [] as $c) {
     $id = $c['Command Status']['Controller'] ?? count($m['controllers']);
     $r = $c['Response Data'] ?? [];
-    if (!$r) { $m['errors'][] = "controller $id: " . ($c['Command Status']['Description'] ?? 'no data'); continue; }
+    if (!$r) {
+      // storcli runs but supports none of the cards (e.g. SAS2 HBAs such as the 9207/9211/9217): they come from the kernel.
+      if (preg_match('/no controller found/i', $c['Command Status']['Description'] ?? '')) { $m['storcli_none'] = true; continue; }
+      $m['errors'][] = "controller $id: " . ($c['Command Status']['Description'] ?? 'no data'); continue;
+    }
     $b = $r['Basics'] ?? []; $v = $r['Version'] ?? []; $s = $r['Status'] ?? []; $hw = $r['HwCfg'] ?? [];
     $sas = topo_addr($b['SAS Address'] ?? '');
     $ports = []; $phyList = [];
@@ -658,8 +668,8 @@ function topo_ses_config(string $dir, string $sg, array $els): array {
   $subs = [];
   foreach ($j['enclosure_descriptor_list'] ?? [] as $d) {
     $id = $int($d['subenclosure_identifier'] ?? -1);
-    $subs[$id] = ['id' => $id, 'vendor' => trim($d['enclosure_vendor_identification'] ?? ''), 'product' => trim($d['product_identification'] ?? ''),
-                  'rev' => trim($d['product_revision_level'] ?? ''), 'wwn' => topo_addr($d['enclosure_logical_identifier'] ?? '')];
+    $subs[$id] = ['id' => $id, 'vendor' => topo_ses_str($d['enclosure_vendor_identification'] ?? ''), 'product' => topo_ses_str($d['product_identification'] ?? ''),
+                  'rev' => topo_ses_str($d['product_revision_level'] ?? ''), 'wwn' => topo_addr($d['enclosure_logical_identifier'] ?? '')];
   }
   $headers = [];
   foreach ($j['type_descriptor_header_and_text_list'] ?? [] as $t)
@@ -769,7 +779,7 @@ function topo_sysfs_hba(string $dir, array &$m, array &$labels, array $k, array 
     $m['controllers'][] = [
       'id' => (int)$h, 'model' => $hi['board'] ?: ($hi['driver'] ?: 'SAS HBA') . " (host$h)", 'serial' => '', 'sas' => $sas, 'pci' => '',
       'fw_package' => '', 'fw' => $hi['fw'] ?? '', 'bios' => '', 'driver' => $hi['driver'] ?? '', 'status' => 'Optimal',
-      'personality' => 'HBA (kernel view, storcli not installed)', 'roc_temp' => null, 'memory' => '', 'pending_fw' => null, 'cli' => '',
+      'personality' => 'HBA (kernel view, ' . (!empty($m['storcli_ran']) ? 'not supported by storcli)' : 'storcli not installed)'), 'roc_temp' => null, 'memory' => '', 'pending_fw' => null, 'cli' => '',
       'ports' => array_values($ports), 'phy_list' => $phyList, 'unused_phys' => count(array_filter($phyList, fn($x) => $x['port'] === null)),
       'encl' => [], 'connector_names' => [], 'sysfs' => true,
     ];
@@ -1032,6 +1042,8 @@ function topo_problems(array &$m): void {
     $p[] = ['level' => $level, 'text' => $text, 'key' => $key ?? $text, 'value' => (string)($value ?? $text)];
   };
   foreach ($m['errors'] as $e) $add('warn', "Collection: $e");
+  if (!empty($m['storcli_none']) && array_filter($m['controllers'], fn($c) => !empty($c['sysfs'])))
+    $add('info', 'storcli is installed but supports none of these controllers (it covers SAS3 cards and newer; SAS2 cards such as the 9207/9211/9217 are not), so they are shown from the kernel\'s view.', 'storcli|none', '');
   if ($m['storcli'] === '' && $m['megaraid'])
     $add('info', 'A MegaRAID controller is present but storcli is not installed, so controller, port and per-drive detail is missing.');
   if (!$m['detail']) $add('info', 'Per-drive detail skipped because a disk is spun down (this page never wakes drives).');

@@ -347,6 +347,21 @@ t(topo_psu_problem(['level' => 'unknown', 'status' => 'Unknown', 'flags' => ['ac
   && topo_psu_problem(['level' => 'crit', 'status' => 'Critical', 'flags' => ['ac_fail', 'off']]) !== '', 'PSU flags ignored only for unknown and absent levels');
 
 // ---------------------------------------------------------------------------------------------------------
+$section = 'storcli-no-controller';
+// storcli installed but supporting none of the cards (SAS2 HBAs): no collection warning, one note, kernel view says so.
+$d = "$tmp/storcli-none"; copy_dir("$fx/hba-dual-expander", $d);
+file_put_contents("$d/ctrl.json", json_encode(['Controllers' => [['Command Status' => ['CLI Version' => '007.3404.0000.0000', 'Controller' => 0,
+  'Status' => 'Failure', 'Description' => 'No Controller found']]]]));
+$m = load($d);
+t(!matching($m, '/^Collection:/'), 'no "Collection: controller 0: No Controller found" warning: ' . dump_problems($m));
+t(count(matching($m, '/storcli is installed but supports none of these controllers/', 'info')) === 1, 'one info note about storcli');
+t($m['controllers'] && str_contains($m['controllers'][0]['personality'], 'not supported by storcli'), 'kernel HBA mode says not supported by storcli');
+$m0 = load("$fx/hba-dual-expander");
+t($m0['controllers'] && str_contains($m0['controllers'][0]['personality'], 'storcli not installed'), 'without storcli the mode still says not installed');
+t(!matching($m0, '/storcli is installed/'), 'no storcli note when storcli is absent');
+rm_dir($d);
+t(topo_ses_str('000B0027\x00\x00\x00') === '000B0027' && topo_ses_str("ABC\0\0 ") === 'ABC' && topo_ses_str(' EMC     ') === 'EMC', 'NUL padding is stripped from SES strings');
+
 $section = 'anonymise';
 $d2 = "$tmp/anon";
 copy_dir("$fx/it-mode-sas3224", $d2);
@@ -411,6 +426,7 @@ foreach (glob("$fx/*", GLOB_ONLYDIR) as $d) {
   if ($name === 'usb-short-ses') t(str_contains($html, 'No SAS controllers found. This page is for SAS HBAs/RAID controllers and disk shelves; USB enclosures are shown below.')
     && str_contains($html, 'USB enclosure: WD My Book Duo 25F6') && str_contains($html, 'Supports only the short status page'), 'usb page text');
   if ($name === 'emc-ktn-stl3') t(str_contains($html, '(shelf fault LED on)') && str_contains($html, 'PSU B'), 'emc page shows the fault LED note');
+  if ($name === 'emc-ktn-stl3') t(!str_contains($html, '\\x00') && str_contains($html, '000B0027'), 'emc page: PSU part without NUL padding');
   if ($name === 'netapp-single-path') t(str_contains($html, '>fault sensed</span>') && str_contains($html, '>fault LED by host</span>')
     && str_contains($html, 'Clear with: sg_ses --dev-slot-num=1 --clear=fault /dev/sg2')
     && preg_match('/st-bay warn" title="[^"]*fault sensed[^"]*"><span class="n">0</', $html)

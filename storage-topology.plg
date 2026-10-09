@@ -2,8 +2,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.14">
-<!ENTITY md5        "3d334cad2314d5adad95798f42c85c4e">
+<!ENTITY version    "2026.10.15">
+<!ENTITY md5        "a453e2e681b9b2264c71072ffa86da0a">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
@@ -24,6 +24,9 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.15
+- SAS2 HBAs (9207/9211/9217...) with storcli installed: no more "Collection: controller 0: No Controller found" warning; storcli does not support SAS2 cards, so a note says so and the card's mode reads "kernel view, not supported by storcli".
+- Shelf PSU/subenclosure part numbers no longer show NUL padding (e.g. EMC "000B0027\x00\x00...").
 ###2026.10.14
 - Storage: a controller whose storcli data has no controller status (some OEM IT-mode firmware, e.g. Inspur's SAS3008)
   is no longer critical. The status shows as "not reported", with one note that storcli returned only partial data for
