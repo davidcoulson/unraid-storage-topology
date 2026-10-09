@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.09">
+<!ENTITY version    "2026.10.09a">
 <!ENTITY md5        "3cd922c2449152ced0ad03e8e705fecf">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
@@ -19,6 +19,8 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.09a
+- Install message: report storcli correctly (it said "not found" when only some of the searched paths were missing).
 ###2026.10.09
 - Initial release.
 </CHANGES>
@@ -40,7 +42,12 @@ rm -f $(ls &plgPATH;/&name;-*.txz 2>/dev/null | grep -v '&version;')
 echo ""
 echo "Storage Topology &version; installed: Tools > System Information > Storage Topology"
 command -v sg_ses >/dev/null || echo "Note: sg_ses (sg3_utils) was not found, so enclosure health will be missing."
-ls /sbin/storcli /usr/sbin/storcli /usr/local/sbin/storcli /sbin/storcli64 /usr/sbin/storcli64 /opt/MegaRAID/storcli/storcli64 >/dev/null 2>&amp;1 \
+found=
+for b in /sbin/storcli /usr/sbin/storcli /usr/local/sbin/storcli /usr/bin/storcli /usr/local/bin/storcli \
+         /sbin/storcli64 /usr/sbin/storcli64 /usr/local/sbin/storcli64 /opt/MegaRAID/storcli/storcli64; do
+  [ -x "$b" ] &amp;&amp; found=$b &amp;&amp; break
+done
+[ -n "$found" ] &amp;&amp; echo "Using storcli: $found" \
   || echo "Note: storcli was not found. Broadcom/LSI controller and per-drive detail needs it; the kernel view is used instead."
 echo ""
 </INLINE>
