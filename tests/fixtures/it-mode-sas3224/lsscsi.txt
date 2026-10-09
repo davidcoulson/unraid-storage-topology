@@ -1,0 +1,20 @@
+[0:0:0:0]    disk    ATA      SAMSUNG MZ7LM1T9 204Q  /dev/sda   /dev/sg0
+[0:0:1:0]    disk    ATA      SAMSUNG MZ7LM1T9 204Q  /dev/sdb   /dev/sg1
+[0:0:2:0]    disk    ATA      SAMSUNG MZ7LM1T9 204Q  /dev/sdc   /dev/sg2
+[0:0:3:0]    disk    ATA      SAMSUNG MZ7LM1T9 204Q  /dev/sdd   /dev/sg3
+[0:0:4:0]    disk    ATA      SAMSUNG MZ7LM1T9 204Q  /dev/sde   /dev/sg4
+[0:0:5:0]    disk    ATA      SAMSUNG MZ7LM1T9 204Q  /dev/sdf   /dev/sg5
+[0:0:6:0]    disk    HGST     HUH721010AL5200  LS21  /dev/sdh   /dev/sg6
+[0:0:7:0]    disk    HGST     HUH721010AL5200  LS21  /dev/sdi   /dev/sg7
+[0:0:8:0]    disk    HGST     HUH721010AL5200  LS21  /dev/sdj   /dev/sg8
+[0:0:9:0]    disk    HGST     HUH721010AL5200  LS21  /dev/sdk   /dev/sg9
+[0:0:10:0]   disk    HGST     HUH721010AL5200  LS21  /dev/sdl   /dev/sg10
+[0:0:11:0]   disk    HGST     HUH721010AL5200  LS21  /dev/sdm   /dev/sg11
+[0:0:12:0]   disk    HGST     HUH721010AL5200  LS21  /dev/sdn   /dev/sg12
+[0:0:13:0]   disk    HGST     HUH721010AL5200  LS21  /dev/sdo   /dev/sg13
+[0:0:14:0]   disk    HGST     HUH721010AL5200  LS21  /dev/sdp   /dev/sg14
+[0:0:15:0]   disk    HGST     HUH721010AL5200  LS21  /dev/sdq   /dev/sg15
+[0:0:16:0]   disk    HGST     HUH721010AL5200  LS21  /dev/sdr   /dev/sg16
+[0:0:17:0]   disk    HGST     HUH721010AL5200  LS21  /dev/sds   /dev/sg17
+[0:0:18:0]   enclosu LSI CORP SAS2X28          0717  -          /dev/sg18
+[0:0:19:0]   disk    ATA      SAMSUNG MZ7LM1T9 204Q  /dev/sdg   /dev/sg19

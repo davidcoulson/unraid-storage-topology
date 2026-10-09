@@ -5,16 +5,20 @@ Tag="sitemap"
 Markdown="false"
 ---
 <?PHP
-/* SAS storage topology: MegaRAID controller -> ports -> shelf I/O modules -> bays, with shelf power, cooling and
- * sensors, cable map, firmware, and per-drive link speed and errors mapped to Unraid disk names.
+/* SAS storage topology: controller -> ports and connectors -> shelf I/O modules or expanders -> bays, with shelf power,
+ * cooling and sensors, cable map, firmware, drives outside any bay, simple (USB / short-status) enclosures, and
+ * per-drive link speed and errors mapped to Unraid disk names. Problems can be acknowledged (include/ack.php).
  * Data: scripts/collect.sh (read-only storcli/sg_ses/sysfs, cached 60 s), parsed by include/topology.php.
  */
 $em = "$docroot/plugins/storage-topology";
 require_once "$em/include/topology.php";
+require_once "$em/include/common.php";
 $maxAge = isset($_GET['refresh']) ? 5 : 60;
 exec("timeout 100 $em/scripts/collect.sh $maxAge 2>&1", $out, $rc);
 $m = topo_load();
-if ($rc !== 0) array_unshift($m['problems'], ['level' => 'warn', 'text' => "Collector exit $rc - showing the last good data." . ($out ? ' ' . implode(' ', $out) : '')]);
+if ($rc !== 0) array_unshift($m['problems'], ['level' => 'warn', 'text' => "Collector exit $rc - showing the last good data." . ($out ? ' ' . implode(' ', $out) : ''),
+                                              'key' => 'collector-exit', 'value' => (string)$rc]);
+st_acks_apply($m, 'storage');
 
 $unitF = ($display['unit'] ?? 'C') === 'F';
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
@@ -48,6 +52,8 @@ table.st td.num{text-align:right;white-space:nowrap}
 .st-sensors{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
 .st-problems{margin:6px 0 0 0;padding-left:18px}.st-problems li{margin:2px 0}
 .st-flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:.95em}
+.st-ack{margin-left:10px;font-size:.85em;opacity:.7}.st-acked{margin:4px 0 0 0}.st-acked summary{cursor:pointer}
+tr.st-dim td{opacity:.55}
 @media (max-width:900px){.st-bays{grid-template-columns:repeat(3,1fr)}}
 </style>
 <div class="st-wrap">
@@ -56,12 +62,12 @@ table.st td.num{text-align:right;white-space:nowrap}
 <span class="st-dim">Collected <?=$age === null ? 'never' : ($age < 5 ? 'just now' : "{$age} s ago")?>
 (<?=array_sum(array_column($m['timings'], 'ms'))?> ms, read-only storcli/sg_ses, cached 60 s).</span>
 <a href="?refresh=1" style="margin-left:10px">Refresh</a>
+<?=st_diag_html()?>
 </p>
-<?if ($m['problems']):?>
-<ul class="st-problems">
-<?foreach ($m['problems'] as $p):?><li class="st-<?=$p['level']?>"><?=$h($p['text'])?></li><?endforeach;?>
-</ul>
+<?if ($m['no_sas']):?>
+<p class="st-info">No SAS controllers found. This page is for SAS HBAs/RAID controllers and disk shelves<?=$m['enclosures'] ? '; ' . (array_filter(array_column($m['enclosures'], 'usb')) ? 'USB enclosures are' : 'enclosures are') . ' shown below.' : '.'?></p>
 <?endif;?>
+<?=st_problems_html($m, 'storage')?>
 
 <?foreach ($m['controllers'] as $c):
   $cl = $c['status'] === 'Optimal' ? 'ok' : 'crit';
@@ -69,32 +75,65 @@ table.st td.num{text-align:right;white-space:nowrap}
 <div class="st-card">
 <h3><i class="fa fa-microchip"></i> <?=$h($c['model'])?> <span class="st-dim">c<?=$c['id']?></span> <?=$chip($cl, $h($c['status']))?></h3>
 <div class="st-kv">
-<div><span>Serial</span><?=$h($c['serial'])?></div>
-<div><span>Firmware package</span><?=$h($c['fw_package'])?> (<?=$h($c['fw'])?>)</div>
-<div><span>BIOS</span><?=$h($c['bios'])?></div>
-<div><span>Driver</span><?=$h($c['driver'])?></div>
-<div><span>Mode</span><?=$h($c['personality'])?></div>
-<div><span>Chip temperature</span><?=$temp($c['roc_temp'])?></div>
-<div><span>Cache memory</span><?=$h($c['memory'])?></div>
-<div><span>PCI</span><?=$h($c['pci'])?></div>
-<div><span>SAS address</span><?=$h($c['sas'])?></div>
-<div><span>storcli</span><?=$h(explode(' ', $c['cli'])[0])?></div>
+<?foreach (['Serial' => $c['serial'], ($c['fw_package'] !== '' ? 'Firmware package' : 'Firmware') => $c['fw_package'] !== '' ? "{$c['fw_package']} ({$c['fw']})" : $c['fw'],
+             'BIOS' => $c['bios'], 'Driver' => $c['driver'], 'Mode' => $c['personality']] as $k => $v) if ((string)$v !== '') echo "<div><span>{$h($k)}</span>{$h($v)}</div>\n";?>
+<?if ($c['roc_temp'] !== null):?><div><span>Chip temperature</span><?=$temp($c['roc_temp'])?></div>
+<?endif;?>
+<?foreach (['Cache memory' => $c['memory'], 'PCI' => $c['pci'], 'SAS address' => $c['sas'], 'storcli' => explode(' ', $c['cli'])[0]] as $k => $v) if ((string)$v !== '') echo "<div><span>{$h($k)}</span>{$h($v)}</div>\n";?>
 </div>
 <h4>Ports</h4>
 <table class="st">
-<tr><th>Port</th><th>PHYs</th><th>Width</th><th>Lane rates</th><th>Attached to</th><th>Address</th></tr>
+<tr><th>Port</th><th>PHYs</th><th>Width</th><th>Lane rates</th><th>Connectors</th><th>Attached to</th><th>Address</th></tr>
 <?foreach ($c['ports'] as $p):
-  $w = count($p['phys']); $low = $p['rates'] && min($p['rates']) < 12;
+  $w = count($p['phys']);
+  $expTip = $p['expect'] ? 'Expected ' . $rate($p['expect']) . ($p['remote_max'] ? " (this side up to {$rate($p['local_max'])}, far end up to {$rate($p['remote_max'])})" : '') : 'The far end does not report its maximum rate';
 ?>
 <tr><td>Port <?=$p['port']?></td><td><?=implode(', ', $p['phys'])?></td>
-<td><?=$chip($w >= 4 ? 'ok' : 'warn', "x$w")?></td>
-<td><?=$chip($low ? 'warn' : 'ok', implode(' / ', array_map($rate, $p['rates'])))?></td>
+<td><?=$chip($w < 4 && $p['expander'] ? 'warn' : 'ok', "x$w")?><?=$p['wide'] ? " <span class='st-dim'>wide port</span>" : ''?></td>
+<td><?=$chip($p['slow'] ? 'warn' : 'ok', implode(' / ', array_map($rate, $p['rates'])), $expTip)?></td>
+<td><?=$h(implode('+', $p['connectors']))?></td>
 <td><?=$h($p['attached_label'])?> <span class="st-dim"><?=$h($p['type'])?></span></td><td class="st-dim"><?=$h($p['attached'])?></td></tr>
 <?endforeach;?>
-<?if ($c['unused_phys']):?><tr><td colspan="6" class="st-dim"><?=$c['unused_phys']?> PHYs not connected.</td></tr><?endif;?>
 </table>
+<?if ($c['connectors']):
+  $unused = [];
+  foreach ($c['connectors'] as $g) {
+    $free = array_values(array_diff($g['phys'], array_keys($g['linked'])));
+    if (!$free) continue;
+    $unused[] = count($free) === count($g['phys']) ? "{$g['label']} ({$g['phy_text']})" : "{$g['label']} PHY " . implode(', ', $free);
+  }
+?>
+<h4>Connectors</h4>
+<table class="st">
+<tr><th>Connector</th><th>PHYs</th><th>Lanes linked</th><th>Lane rates</th><th>Ports</th><th>Attached to</th></tr>
+<?foreach ($c['connectors'] as $g): if (!$g['linked']) continue;?>
+<tr><td><b><?=$h($g['label'])?></b></td><td><?=$h(implode(', ', $g['phys']))?></td>
+<td><?=$chip($g['level'], count($g['linked']) . ' of ' . count($g['phys']), $g['partial'] ? 'Partially linked: check the cable and connector' : '')?></td>
+<td><?=implode(' / ', array_map($rate, $g['linked']))?></td><td><?=$h(implode(', ', array_map(fn($x) => "Port $x", $g['ports'])))?></td>
+<td><?=$h(implode('; ', $g['attached']))?></td></tr>
+<?endforeach;?>
+<?if ($unused):?><tr><td colspan="6" class="st-dim"><?=$c['unused_phys']?> PHYs not connected: <?=$h(implode(', ', $unused))?>.</td></tr><?endif;?>
+</table>
+<p class="st-dim" style="margin:2px 0">Connectors are derived (4 PHYs per connector, counted from PHY 0) and may not match the labels on the card.<?=
+  $c['connector_names'] ? ' storcli reports the enclosures on ' . $h(implode('; ', array_map(fn($e, $n) => "$e: $n", array_keys($c['connector_names']), $c['connector_names']))) . '.' : ''?></p>
+<?endif;?>
 </div>
 <?endforeach;?>
+
+<?if ($m['direct']):?>
+<div class="st-card">
+<h3><i class="fa fa-hdd-o"></i> Directly attached drives <span class="st-dim">not in any enclosure bay</span></h3>
+<table class="st">
+<tr><th>Port</th><th>Disk</th><th>Device</th><th>Model</th><th>Size</th><th>Temp</th><th>Link</th><th></th></tr>
+<?foreach ($m['direct'] as $x): $d = $m['drives'][$x['drive']];?>
+<tr><td><?=$h($x['where'])?></td><td><?=$diskLink($d)?><?=$d['unraid_type'] ? " <span class='st-dim'>{$h($d['unraid_type'])}</span>" : ''?></td><td><?=$h($d['dev'])?></td>
+<td><?=$h($d['model'])?> <span class="st-dim"><?=$h($d['intf'])?></span></td><td class="num"><?=$h($d['size'])?></td><td class="num"><?=$temp($d['temp'])?></td>
+<td><?=$d['rate'] ? $chip($d['max_rate'] && $d['rate'] < $d['max_rate'] ? 'info' : 'ok', $rate($d['rate']) . ($d['max_rate'] ? ' of ' . $rate($d['max_rate']) : '')) : '-'?></td>
+<td class="st-dim"><?=$h($x['note'])?></td></tr>
+<?endforeach;?>
+</table>
+</div>
+<?endif;?>
 
 <?if ($m['cables']):?>
 <div class="st-card">
@@ -114,6 +153,15 @@ table.st td.num{text-align:right;white-space:nowrap}
   $g = $s['groups'];
   $levels = [$s['level']];
   foreach (['psu', 'fan', 'temp', 'volt', 'amp', 'conn', 'esc'] as $k) foreach ($g[$k] as $x) $levels[] = $x['level'];
+  foreach ($g['fan'] as $x) if ($x['level'] === 'ok' && !empty($x['flags'])) $levels[] = 'warn';
+  // Sensors grouped by subenclosure (EMC: LCC A, LCC B, chassis, PSU A, PSU B) when the enclosure has several.
+  $bySub = function (array $xs, callable $one) use ($s, $h) {
+    if (!$s['sub_names']) return implode('', array_map($one, $xs));
+    $out = []; $groups = [];
+    foreach ($xs as $x) $groups[$x['sub'] ?? -1][] = $x;
+    foreach ($groups as $sub => $list) $out[] = "<span class='st-dim'>" . $h($s['sub_names'][$sub] ?? "Subenclosure $sub") . ':</span> ' . implode('', array_map($one, $list));
+    return implode(" <span class='st-dim'>&middot;</span> ", $out);
+  };
   foreach ($s['ioms'] as $i) $levels[] = $i['level'];
   $sl = topo_worst(array_intersect($levels, ['ok', 'warn', 'crit']));
   $drives = $s['drives'];
@@ -121,8 +169,11 @@ table.st td.num{text-align:right;white-space:nowrap}
 ?>
 <div class="st-card">
 <h3><i class="fa fa-server"></i> <?=$h($s['label'])?> <span class="st-dim"><?=$h("{$s['vendor']} {$s['product']}")?></span> <?=$chip($sl, $lvlText[$sl])?>
-<span class="st-dim" style="font-size:.8em"><?=$s['eid'] !== null ? "storcli e{$s['eid']}" : ''?> &middot; SES <?=$h(implode(', ', $s['sg']))?> &middot; SN <?=$h($s['serial'])?> &middot; <?=count($drives)?> drives</span></h3>
+<span class="st-dim" style="font-size:.8em"><?=implode(' &middot; ', array_filter([$s['eid'] !== null ? "storcli e{$s['eid']}" : '', 'SES ' . $h(implode(', ', $s['sg'])),
+  $s['serial'] !== '' ? 'SN ' . $h($s['serial']) : '', count($drives) . ' drives']))?></span>
+<?=$s['fault_explained'] ? "<span class='st-{$s['level']}' style='font-size:.85em'>(shelf fault LED on)</span>" : ''?></h3>
 
+<?if ($s['ioms']):?>
 <h4>I/O modules</h4>
 <table class="st">
 <tr><th>Module</th><th>Status</th><th>Firmware</th><th>Part</th><th>Serial</th><th>Expander address</th></tr>
@@ -130,13 +181,17 @@ table.st td.num{text-align:right;white-space:nowrap}
 <tr><td><?=$h($i['name'])?></td><td><?=$chip($i['level'], $h($i['status']))?></td><td><b><?=$h($i['fw'])?></b></td><td><?=$h($i['pn'])?></td><td><?=$h($i['serial'])?></td><td class="st-dim"><?=$h($i['sas'])?></td></tr>
 <?endforeach;?>
 </table>
+<?endif;?>
 
+<?$psuIn = array_filter($g['psu'], fn($x) => $x['level'] !== 'absent');
+if ($g['psu'] || $g['fan'] || $g['volt'] || $g['amp']):?>
 <h4>Power and cooling</h4>
+<?if ($psuIn):?>
 <table class="st">
 <tr><th>PSU</th><th>Status</th><th>Firmware</th><th>Part</th><th>Serial</th><th>Rating</th><?if ($paired):?><th>Fans</th><th>Voltages</th><th>Currents</th><?endif;?></tr>
 <?foreach ($g['psu'] as $n => $x):?>
-<tr><td>PSU <?=$n + 1?></td><td><?=$chip($x['level'], $h($x['status']) . ($x['flags'] ? ' (' . $h(implode(', ', $x['flags'])) . ')' : ''))?></td>
-<td><?=$h($x['kv']['FW'] ?? '')?></td><td><?=$h($x['kv']['PN'] ?? '')?></td><td><?=$h($x['kv']['SN'] ?? '')?></td><td><?=isset($x['kv']['PW']) ? $h($x['kv']['PW']) . ' W' : ''?></td>
+<tr<?=$x['level'] === 'absent' ? ' class="st-dim"' : ''?>><td><?=$x['name'] !== '' ? $h(topo_short_name($x['name'])) : 'PSU ' . ($n + 1)?></td><td><?=$chip($x['level'], $h($x['status']) . ($x['flags'] ? ' (' . $h(implode(', ', $x['flags'])) . ')' : ''))?></td>
+<td><?=$h($x['fw'])?></td><td><?=$h($x['pn'])?></td><td><?=$h($x['kv']['SN'] ?? '')?></td><td><?=isset($x['kv']['PW']) ? $h($x['kv']['PW']) . ' W' : ''?></td>
 <?if ($paired):?>
 <td><?foreach ([2 * $n, 2 * $n + 1] as $f) echo $chip($g['fan'][$f]['level'], $g['fan'][$f]['rpm'] . ' rpm', $g['fan'][$f]['code']) . ' ';?></td>
 <td><?foreach ([2 * $n, 2 * $n + 1] as $f) echo $chip($g['volt'][$f]['level'], number_format($g['volt'][$f]['value'], 2) . ' V') . ' ';?></td>
@@ -145,19 +200,24 @@ table.st td.num{text-align:right;white-space:nowrap}
 </tr>
 <?endforeach;?>
 </table>
-<?if ($paired):?><p class="st-dim" style="margin:2px 0">Fans, voltages and currents are shown two per PSU, in SES sensor order.</p>
+<?endif;?>
+<?if ($paired && $psuIn):?><p class="st-dim" style="margin:2px 0">Fans, voltages and currents are shown two per PSU, in SES sensor order.</p>
 <?else:?>
 <div class="st-sensors">
-<?foreach ($g['fan'] as $x) echo $chip($x['level'], 'Fan ' . ($x['n'] + 1) . ': ' . $x['rpm'] . ' rpm');?>
+<?if (!$psuIn) foreach ($g['psu'] as $x) echo $chip($x['level'], ($x['name'] !== '' ? $h(topo_short_name($x['name'])) : 'PSU ' . ($x['n'] + 1)) . ': ' . $h($x['status']));?>
+<?=$bySub($g['fan'], fn($x) => $chip($x['level'] === 'ok' && !empty($x['flags']) ? 'warn' : $x['level'], ($x['name'] !== '' ? $h(topo_short_name($x['name'])) : 'Fan ' . ($x['n'] + 1)) . ': ' . ($x['level'] === 'absent' ? 'not installed' : (int)$x['rpm'] . ' rpm') . ($x['flags'] && $x['level'] !== 'absent' ? ' (' . $h(implode(', ', $x['flags'])) . ')' : ''), $x['code']) . ' ')?>
 <?foreach ($g['volt'] as $x) echo $chip($x['level'], 'V' . ($x['n'] + 1) . ': ' . ($x['value'] === null ? 'n/a' : number_format($x['value'], 2) . ' V'));?>
 <?foreach ($g['amp'] as $x) echo $chip($x['level'], 'I' . ($x['n'] + 1) . ': ' . ($x['value'] === null ? 'n/a' : number_format($x['value'], 2) . ' A'));?>
 </div>
 <?endif;?>
+<?endif;?>
 
+<?if ($g['temp']):?>
 <h4>Temperatures <?php $tv = array_filter(array_column($g['temp'], 'value'), fn($v) => $v !== null); if ($tv):?><span class="st-dim">max <?=$temp(max($tv))?></span><?endif;?></h4>
 <div class="st-sensors">
-<?foreach ($g['temp'] as $x) echo $chip($x['flags'] ? 'warn' : $x['level'], 'T' . ($x['n'] + 1) . ' ' . $temp($x['value']), $x['desc'] ?: '');?>
+<?=$bySub($g['temp'], fn($x) => $chip($x['flags'] ? 'warn' : $x['level'], ($x['name'] !== '' ? $h($x['name']) : 'T' . ($x['n'] + 1)) . ' ' . $temp($x['value']), $x['desc'] ?: '') . ' ')?>
 </div>
+<?endif;?>
 
 <h4>Bays</h4>
 <div class="st-bays">
@@ -207,7 +267,7 @@ $fw = [];
 foreach ($m['controllers'] as $c) $fw['Controller'][$c['fw_package'] . " ({$c['fw']})"][] = "{$c['model']} c{$c['id']}";
 foreach ($m['shelves'] as $s) {
   foreach ($s['ioms'] as $i) $fw['Shelf I/O modules'][$i['fw']][] = "{$s['label']} {$i['name']}";
-  foreach ($s['groups']['psu'] as $n => $x) if (isset($x['kv']['FW'])) $fw['Shelf PSUs'][$x['kv']['FW']][] = "{$s['label']} PSU " . ($n + 1);
+  foreach ($s['groups']['psu'] as $n => $x) if ($x['fw'] !== '') $fw['Shelf PSUs'][$x['fw']][] = "{$s['label']} " . ($x['name'] !== '' ? topo_short_name($x['name']) : 'PSU ' . ($n + 1));
 }
 foreach ($m['drives'] as $d) if ($d['fw']) $fw["Drives: {$d['model']}"][$d['fw']][] = $d['unraid'] ?: ($d['dev'] ?: "e{$d['eid']}/s{$d['slot']}");
 ?>
@@ -238,8 +298,36 @@ It does not track every slot, so check Main for the drives themselves. Its volta
 </div>
 <?endforeach;?>
 
-<?if ($m['errors']):?>
-<p class="st-warn">Collection problems: <?=$h(implode('; ', $m['errors']))?></p>
+<?foreach ($m['enclosures'] as $e):?>
+<div class="st-card">
+<h3><i class="fa fa-<?=$e['usb'] ? 'usb' : 'hdd-o'?>"></i> <?=$e['usb'] ? 'USB enclosure' : 'Enclosure'?>: <?=$h($e['name'])?>
+<?=$e['disks'] ? '<span>(' . $h(implode(', ', array_map(fn($d) => $d['dev'] . ($d['unraid'] ? " → {$d['unraid']}" : ''), $e['disks']))) . ')</span>' : ''?>
+<span class="st-dim"><?=$h(trim("SES {$e['sg']}, {$e['vendor']} {$e['product']}") . ($e['rev'] !== '' ? ", firmware {$e['rev']}" : '') . ($e['driver'] ? ", {$e['driver']}" : ''))?></span>
+<?=$chip($e['level'] === 'unknown' ? 'unknown' : $e['level'], $h($e['status_text'] ?: 'unknown'), $e['status'] ? sprintf('Short enclosure status byte 0x%02x', $e['status']['byte']) : '')?></h3>
+<?if ($e['short_status_only']):?>
+<p class="st-dim" style="margin:2px 0">Supports only the short status page: overall status only, no per-bay, fan or PSU detail.</p>
+<?elseif ($e['groups']): $g = $e['groups'];?>
+<div class="st-sensors">
+<?foreach ($g['temp'] as $x) echo $chip($x['level'], $h($x['desc'] ?: 'Temp ' . ($x['n'] + 1)) . ': ' . $temp($x['value']));?>
+<?foreach ($g['fan'] as $x) echo $chip($x['level'], $h($x['desc'] ?: 'Fan ' . ($x['n'] + 1)) . ': ' . ($x['rpm'] ? $x['rpm'] . ' rpm' : $h($x['status'])));?>
+<?foreach ($g['psu'] as $x) echo $chip($x['level'], $h($x['desc'] ?: 'PSU ' . ($x['n'] + 1)) . ': ' . $h($x['status']));?>
+</div>
 <?endif;?>
+<?if ($e['disks']):?>
+<table class="st">
+<tr><th></th><th>Disk</th><th>Device</th><th>Model</th><th>Size</th><th>Temp</th></tr>
+<?foreach ($e['disks'] as $d):?>
+<tr><td class="st-dim"><?=$h($d['where'])?></td><td><?=$diskLink($d)?><?=$d['unraid_type'] ? " <span class='st-dim'>{$h($d['unraid_type'])}</span>" : ''?></td><td><?=$h($d['dev'])?></td>
+<td><?=$h($d['model'])?></td><td class="num"><?=$h($d['size'])?></td><td class="num"><?=$temp($d['temp'])?></td></tr>
+<?endforeach;?>
+</table>
+<?if ($e['disk_source'] === 'host'):?><p class="st-dim" style="margin:2px 0">No bay data: these are the disks on the same SCSI host, which may include drives outside this enclosure.</p><?endif;?>
+<?else:?>
+<p class="st-dim" style="margin:2px 0">No bay data.</p>
+<?endif;?>
+</div>
+<?endforeach;?>
+
 <p class="st-dim">Cache: <code>/var/local/storage-topology/current</code>. Timings: <?=$h(implode(', ', array_map(fn($k, $t) => "$k {$t['ms']} ms", array_keys($m['timings']), $m['timings'])))?>.</p>
 </div>
+<?=st_problems_js($var['csrf_token'] ?? '')?>

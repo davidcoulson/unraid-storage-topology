@@ -1,0 +1,156 @@
+{
+ "blockdevices": [
+  {
+   "name": "sda",
+   "serial": "S2TVNX0TEST0001",
+   "wwn": "0x5002538c40000001",
+   "tran": "sas",
+   "model": "SAMSUNG MZ7LM1T9HMJP-00005",
+   "size": "1.7T"
+  },
+  {
+   "name": "sdb",
+   "serial": "S2TVNX0TEST0002",
+   "wwn": "0x5002538c40000002",
+   "tran": "sas",
+   "model": "SAMSUNG MZ7LM1T9HMJP-00005",
+   "size": "1.7T"
+  },
+  {
+   "name": "sdc",
+   "serial": "S2TVNX0TEST0003",
+   "wwn": "0x5002538c40000003",
+   "tran": "sas",
+   "model": "SAMSUNG MZ7LM1T9HMJP-00005",
+   "size": "1.7T"
+  },
+  {
+   "name": "sdd",
+   "serial": "S2TVNX0TEST0004",
+   "wwn": "0x5002538c40000004",
+   "tran": "sas",
+   "model": "SAMSUNG MZ7LM1T9HMJP-00005",
+   "size": "1.7T"
+  },
+  {
+   "name": "sde",
+   "serial": "S2TVNX0TEST0005",
+   "wwn": "0x5002538c40000005",
+   "tran": "sas",
+   "model": "SAMSUNG MZ7LM1T9HMJP-00005",
+   "size": "1.7T"
+  },
+  {
+   "name": "sdf",
+   "serial": "S2TVNX0TEST0006",
+   "wwn": "0x5002538c40000006",
+   "tran": "sas",
+   "model": "SAMSUNG MZ7LM1T9HMJP-00005",
+   "size": "1.7T"
+  },
+  {
+   "name": "sdh",
+   "serial": "7JTEST01",
+   "wwn": "0x5000cca250000000",
+   "tran": "sas",
+   "model": "HUH721010AL5200",
+   "size": "9.1T"
+  },
+  {
+   "name": "sdi",
+   "serial": "7JTEST02",
+   "wwn": "0x5000cca250000004",
+   "tran": "sas",
+   "model": "HUH721010AL5200",
+   "size": "9.1T"
+  },
+  {
+   "name": "sdj",
+   "serial": "7JTEST03",
+   "wwn": "0x5000cca250000008",
+   "tran": "sas",
+   "model": "HUH721010AL5200",
+   "size": "9.1T"
+  },
+  {
+   "name": "sdk",
+   "serial": "7JTEST04",
+   "wwn": "0x5000cca25000000c",
+   "tran": "sas",
+   "model": "HUH721010AL5200",
+   "size": "9.1T"
+  },
+  {
+   "name": "sdl",
+   "serial": "7JTEST05",
+   "wwn": "0x5000cca250000010",
+   "tran": "sas",
+   "model": "HUH721010AL5200",
+   "size": "9.1T"
+  },
+  {
+   "name": "sdm",
+   "serial": "7JTEST06",
+   "wwn": "0x5000cca250000014",
+   "tran": "sas",
+   "model": "HUH721010AL5200",
+   "size": "9.1T"
+  },
+  {
+   "name": "sdn",
+   "serial": "7JTEST07",
+   "wwn": "0x5000cca250000018",
+   "tran": "sas",
+   "model": "HUH721010AL5200",
+   "size": "9.1T"
+  },
+  {
+   "name": "sdo",
+   "serial": "7JTEST08",
+   "wwn": "0x5000cca25000001c",
+   "tran": "sas",
+   "model": "HUH721010AL5200",
+   "size": "9.1T"
+  },
+  {
+   "name": "sdp",
+   "serial": "7JTEST09",
+   "wwn": "0x5000cca250000020",
+   "tran": "sas",
+   "model": "HUH721010AL5200",
+   "size": "9.1T"
+  },
+  {
+   "name": "sdq",
+   "serial": "7JTEST10",
+   "wwn": "0x5000cca250000024",
+   "tran": "sas",
+   "model": "HUH721010AL5200",
+   "size": "9.1T"
+  },
+  {
+   "name": "sdr",
+   "serial": "7JTEST11",
+   "wwn": "0x5000cca250000028",
+   "tran": "sas",
+   "model": "HUH721010AL5200",
+   "size": "9.1T"
+  },
+  {
+   "name": "sds",
+   "serial": "7JTEST12",
+   "wwn": "0x5000cca25000002c",
+   "tran": "sas",
+   "model": "HUH721010AL5200",
+   "size": "9.1T"
+  },
+  {
+   "name": "sdg",
+   "serial": "S2TVNX0TEST0007",
+   "wwn": "0x5002538c40000007",
+   "tran": "sas",
+   "model": "SAMSUNG MZ7LM1T9HMJP-00005",
+   "size": "1.7T"
+  }
+ ]
+}

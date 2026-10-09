@@ -1,0 +1,3 @@
+Enclosure only supports Short enclosure status diagnostic page, status=0x0
+build_type_desc_hdr_arr: couldn't read config page, res=-2
+Some error occurred, try again with '-v' or '-vv' for more information

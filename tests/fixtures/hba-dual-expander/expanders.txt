@@ -1,0 +1,2 @@
+expander-0:0|0x5003048000a1b2bf|LSI|SAS3x28|0717|port-0:0
+expander-0:1|0x5003048000a1b2ff|LSI|SAS3x28|0717|port-0:1

@@ -11,13 +11,14 @@ Markdown="false"
  */
 $em = "$docroot/plugins/storage-topology";
 require_once "$em/include/network.php";
+require_once "$em/include/common.php";
 $maxAge = isset($_GET['refresh']) ? 5 : 60;
 exec("timeout 90 $em/scripts/collect-net.sh $maxAge 2>&1", $out, $rc);
 $m = net_load();
-if ($rc !== 0) {
-  array_unshift($m['problems'], ['level' => 'warn', 'text' => "Collector exit $rc - showing the last good data." . ($out ? ' ' . implode(' ', $out) : ''), 'who' => '']);
-  $m['level'] = net_worst(array_column($m['problems'], 'level'));
-}
+if ($rc !== 0) array_unshift($m['problems'], ['level' => 'warn', 'text' => "Collector exit $rc - showing the last good data." . ($out ? ' ' . implode(' ', $out) : ''), 'who' => '',
+                                              'key' => 'collector-exit', 'value' => (string)$rc]);
+// Acknowledged problems leave the list and no longer colour the page or the cards.
+st_acks_apply($m, 'network');
 
 $unitF = ($display['unit'] ?? 'C') === 'F';
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
@@ -80,6 +81,7 @@ table.st td.num,table.st th.num{text-align:right;white-space:nowrap}
 table.st-mods td{white-space:normal}
 table.st-mods td .st-chip{margin:1px 0}
 table.st-mods td.lanes{max-width:190px}
+.st-ack{margin-left:10px;font-size:.85em;opacity:.7}.st-acked{margin:4px 0 0 0}.st-acked summary{cursor:pointer}
 </style>
 <div class="st-wrap">
 <p>
@@ -89,12 +91,9 @@ table.st-mods td.lanes{max-width:190px}
 <?=$win !== null ? "Changes are shown against a collection {$h($win)} earlier." : 'Changes appear from the next collection on.'?></span>
 <a href="?refresh=1" style="margin-left:10px">Refresh</a>
 <a href="/Tools/StorageTopology" style="margin-left:10px">Storage Topology</a>
+<?=st_diag_html()?>
 </p>
-<?if ($m['problems']):?>
-<ul class="st-problems">
-<?foreach ($m['problems'] as $p):?><li class="st-<?=$p['level']?>"><?=$h($p['text'])?></li><?endforeach;?>
-</ul>
-<?endif;?>
+<?=st_problems_html($m, 'network')?>
 
 <?foreach ($m['cards'] as $key => $c):
   $ports = array_map(fn($n) => $m['ports'][$n], $c['ports']);
@@ -293,9 +292,7 @@ if ($nb):?>
 </div>
 <?endif;?>
 
-<?if ($m['errors']):?>
-<p class="st-warn">Collection problems: <?=$h(implode('; ', $m['errors']))?></p>
-<?endif;?>
 <?$slow = array_column($m['timings'], 'ms'); $slow = array_combine(array_keys($m['timings']), $slow); arsort($slow);?>
 <p class="st-dim">Cache: <code>/var/local/storage-topology/net/current</code>. <?=count($m['timings'])?> commands; slowest: <?=$h(implode(', ', array_map(fn($k, $v) => "$k $v ms", array_keys(array_slice($slow, 0, 3, true)), array_slice($slow, 0, 3, true))))?>.</p>
 </div>
+<?=st_problems_js($var['csrf_token'] ?? '')?>

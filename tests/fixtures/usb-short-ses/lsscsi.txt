@@ -1,0 +1,8 @@
+[0:0:0:0]    disk    SanDisk  Cruzer Fit       1.00  /dev/sda   /dev/sg0
+[1:0:0:0]    disk    ATA      CT1000MX500SSD1  046   /dev/sdb   /dev/sg1
+[4:0:0:0]    disk    ATA      CT1000MX500SSD1  046   /dev/sdc   /dev/sg2
+[2:0:0:0]    disk    WD       My Book Duo 25F6 1011  /dev/sdf   /dev/sg5
+[2:0:0:1]    enclosu WD       SES Device       1011  -          /dev/sg6
+[3:0:0:0]    disk    WD       My Book 25ED     1031  /dev/sdg   /dev/sg7
+[3:0:0:1]    enclosu WD       SES Device       1031  -          /dev/sg8
+[N:0:1:1]    disk    Samsung SSD 990 PRO 2TB__1                 /dev/nvme0n1  -        

@@ -525,7 +525,12 @@ function net_firmware(array &$m): void {
 function net_problems(array &$m): void {
   $p = &$m['problems'];
   // $who: the card key, port or bond the problem belongs to, so the page can colour that card.
-  $add = function ($level, $text, $who = '') use (&$p) { $p[] = ['level' => $level, 'text' => $text, 'who' => $who]; };
+  // $key names what the problem is about (stable across collections); $value is what it says about it now. An
+  // acknowledgement covers one key at one level and one value, so the problem comes back when the value changes
+  // (e.g. a counter grows). Readings that drift (temperatures, DOM values) use an empty value.
+  $add = function ($level, $text, $who = '', $key = null, $value = null) use (&$p) {
+    $p[] = ['level' => $level, 'text' => $text, 'who' => $who, 'key' => $key ?? $text, 'value' => (string)($value ?? $text)];
+  };
   $win = $m['window'] !== null ? 'in the last ' . net_duration($m['window']) : 'since the previous collection';
   foreach ($m['errors'] as $e) $add('warn', "Collection: $e");
   foreach ($m['notes'] as $e) $add('info', "Collection: $e");
@@ -541,24 +546,24 @@ function net_problems(array &$m): void {
       $txt .= $pc['short'] ? sprintf('. About %.0f Gb/s is less than the ports can carry (%.0f Gb/s).', $pc['gbps'], $pc['need'])
                            : ($pc['need'] ? sprintf('. About %.0f Gb/s is still enough for its ports (%.0f Gb/s).', $pc['gbps'], $pc['need']) : '.');
       if (!$pc['slot_limited']) $txt .= ' The slot supports the full link, so check the riser or BIOS PCIe settings; some cards also train down while idle.';
-      $add($pc['level'], $txt, $key);
+      $add($pc['level'], $txt, $key, "pcie|$key", "{$pc['speed']}x{$pc['width']}");
     } elseif ($inUse && $pc && $pc['need'] && $pc['gbps'] && $pc['gbps'] < $pc['need'] * 0.9) {
-      $add('info', sprintf("$who: the card's PCIe link (about %.0f Gb/s) cannot carry all ports at full speed at once (%.0f Gb/s).", $pc['gbps'], $pc['need']), $key);
+      $add('info', sprintf("$who: the card's PCIe link (about %.0f Gb/s) cannot carry all ports at full speed at once (%.0f Gb/s).", $pc['gbps'], $pc['need']), $key, "pcie-bw|$key", "{$pc['speed']}x{$pc['width']}");
     }
     foreach ($c['temps'] as $t) if ($t['level'] !== 'ok')
-      $add($t['level'], "$who: {$t['label']} temperature {$t['c']} C (critical at {$t['crit']} C)", $key);
+      $add($t['level'], "$who: {$t['label']} temperature {$t['c']} C (critical at {$t['crit']} C)", $key, "temp|$key|{$t['label']}", '');
     if ($c['mst'] && $c['mst']['fw'] !== '' && $c['fw'] !== '' && !str_starts_with($c['fw'], $c['mst']['fw']))
-      $add('info', "$who: flash holds firmware {$c['mst']['fw']} but " . preg_replace('/\s*\(.*$/', '', $c['fw']) . ' is running; the flash image takes effect after a reboot.', $key);
+      $add('info', "$who: flash holds firmware {$c['mst']['fw']} but " . preg_replace('/\s*\(.*$/', '', $c['fw']) . ' is running; the flash image takes effect after a reboot.', $key, "mstfw|$key", "{$c['mst']['fw']}|{$c['fw']}");
     foreach (['fatal' => 'crit', 'nonfatal' => 'warn'] as $k => $lvl) if (($c['aer'][$k]['now'] ?? 0) > 0)
-      $add($lvl, "$who: {$c['aer'][$k]['now']} PCIe {$c['aer'][$k]['label']} errors (AER) since boot", $key);
-    if (($c['aer']['cor']['delta'] ?? 0) > 0) $add('info', "$who: {$c['aer']['cor']['delta']} PCIe correctable errors (AER) $win", $key);
+      $add($lvl, "$who: {$c['aer'][$k]['now']} PCIe {$c['aer'][$k]['label']} errors (AER) since boot", $key, "aer|$key|$k", $c['aer'][$k]['now']);
+    if (($c['aer']['cor']['delta'] ?? 0) > 0) $add('info', "$who: {$c['aer']['cor']['delta']} PCIe correctable errors (AER) $win", $key, "aer-grow|$key", $c['aer']['cor']['now']);
   }
 
   $rings = [];
   foreach ($m['ports'] as $n => $pt) {
     if ($pt['up'] && $pt['duplex'] === 'half') $add('warn', "$n: half duplex", $n);
     if ($pt['up'] && $pt['speed'] && $pt['max_speed'] && $pt['speed'] < $pt['max_speed'] && stripos($pt['port_type'], 'twisted') !== false)
-      $add('info', "$n: linked at " . net_speed_text($pt['speed']) . ' but supports ' . net_speed_text($pt['max_speed']) . ' (cable, switch port or autonegotiation).', $n);
+      $add('info', "$n: linked at " . net_speed_text($pt['speed']) . ' but supports ' . net_speed_text($pt['max_speed']) . ' (cable, switch port or autonegotiation).', $n, "speed|$n", $pt['speed']);
 
     // 100G on 25G lanes (SR4, CR4, AOC, CWDM4, PSM4) is specified with RS-FEC (Clause 91).
     $mod = $pt['module'];
@@ -570,7 +575,8 @@ function net_problems(array &$m): void {
       foreach ($pt['counters'] as $x) if ($x['class'] === 'err') $errs += $x['now'];
       $add('warn', "$n: FEC is off on a 100G link with " . ($mod['pn'] ? "a {$mod['pn']} module" : 'this module') . '. 100G links on 25G lanes (AOC, SR4, CR4) are specified with RS-FEC (Clause 91), '
         . "and both ends must use the same FEC mode: check the switch port's FEC setting and change both together (configured here: {$pt['fec']['configured']}). "
-        . ($errs ? number_format($errs) . ' receive errors since boot.' : 'No receive errors so far, but the link has no error-correction margin.'), $n);
+        . ($errs ? number_format($errs) . ' receive errors since boot.' : 'No receive errors so far, but the link has no error-correction margin.'), $n,
+        "fec|$n", "{$pt['fec']['active']}|{$pt['fec']['configured']}");
     }
 
     if ($mod) {
@@ -581,10 +587,10 @@ function net_problems(array &$m): void {
         $val = $r['v'] === null ? '' : (isset($units[$what]) ? $r['v'] . $units[$what] : sprintf('%.2f dBm', $r['dbm']));
         $add($pt['up'] ? $r['level'] : 'info', "$n module " . ($mod['pn'] ? "({$mod['pn']}) " : '') . $names[$what] . ($lane ? " lane $lane" : '') . ($val ? " $val" : '')
           . " is outside the module's " . ($r['level'] === 'crit' ? 'alarm' : 'warning') . ' range' . (!empty($r['flag']) ? " ({$r['flag']} flag set)" : '')
-          . ($pt['up'] ? '' : ' (port is down)') . '.', $n);
+          . ($pt['up'] ? '' : ' (port is down)') . '.', $n, "mod|$n|$what|$lane", $r['flag'] ?? '');
       }
       if ($mod['los'] !== '' && !preg_match('/^(none|no)$/i', $mod['los']))
-        $add($pt['up'] ? 'warn' : 'info', "$n module reports Rx loss of signal: {$mod['los']}" . ($pt['up'] ? '' : ' (no light from the far end; port is down)'), $n);
+        $add($pt['up'] ? 'warn' : 'info', "$n module reports Rx loss of signal: {$mod['los']}" . ($pt['up'] ? '' : ' (no light from the far end; port is down)'), $n, "los|$n", $mod['los']);
     }
 
     foreach ($pt['counters'] as $k => $x) {
@@ -594,60 +600,60 @@ function net_problems(array &$m): void {
       switch ($x['class']) {
         case 'link':
           if ($grow && ($k === 'link_down_events_phy' || !isset($pt['counters']['link_down_events_phy'])))
-            $add('warn', "$n: link went down $d time" . ($d > 1 ? 's' : '') . " $win ($tot since boot)", $n);
+            $add('warn', "$n: link went down $d time" . ($d > 1 ? 's' : '') . " $win ($tot since boot)", $n, "cnt|$n|$k", $x['now']);
           break;
         case 'err':
-          if ($grow) $add('warn', "$n: {$x['label']} +" . number_format($d) . " $win ($tot since boot)", $n);
-          elseif ($x['now'] > 0) $add('info', "$n: $tot {$x['label']} since boot" . ($d === 0 ? ', not growing' : ''), $n);
+          if ($grow) $add('warn', "$n: {$x['label']} +" . number_format($d) . " $win ($tot since boot)", $n, "cnt|$n|$k", $x['now']);
+          elseif ($x['now'] > 0) $add('info', "$n: $tot {$x['label']} since boot" . ($d === 0 ? ', not growing' : ''), $n, "cnt|$n|$k", $x['now']);
           break;
         case 'fec':
-          if ($grow) $add('info', "$n: FEC corrected " . number_format($d) . " bits $win. Normal at a low rate; it means the link relies on FEC.", $n);
+          if ($grow) $add('info', "$n: FEC corrected " . number_format($d) . " bits $win. Normal at a low rate; it means the link relies on FEC.", $n, "cnt|$n|$k", $x['now']);
           break;
         case 'drop':
           $hint = in_array($k, ['rx_out_of_buffer', 'sys.rx_missed_errors'], true)
             ? ' - the host did not take packets off the receive ring in time' . ($pt['ring'] && $pt['ring']['rx_max'] > $pt['ring']['rx'] ? " (ring {$pt['ring']['rx']} of {$pt['ring']['rx_max']})" : '')
             : ($k === 'rx_discards_phy' ? " - the NIC's port buffer overflowed (bursts or flow control)" : '');
-          if ($grow) $add('warn', "$n: {$x['label']} +" . number_format($d) . " $win ($tot since boot)$hint", $n);
-          elseif ($x['now'] > 0) $add('info', "$n: $tot {$x['label']} since boot" . ($d === 0 ? ', not growing' : '') . $hint, $n);
+          if ($grow) $add('warn', "$n: {$x['label']} +" . number_format($d) . " $win ($tot since boot)$hint", $n, "cnt|$n|$k", $x['now']);
+          elseif ($x['now'] > 0) $add('info', "$n: $tot {$x['label']} since boot" . ($d === 0 ? ', not growing' : '') . $hint, $n, "cnt|$n|$k", $x['now']);
           break;
       }
     }
     if ($pt['up'] && $pt['ring'] && (($pt['ring']['rx'] ?? 0) < ($pt['ring']['rx_max'] ?? 0) || ($pt['ring']['tx'] ?? 0) < ($pt['ring']['tx_max'] ?? 0)))
       $rings["RX {$pt['ring']['rx']} of {$pt['ring']['rx_max']}, TX {$pt['ring']['tx']} of {$pt['ring']['tx_max']}"][] = $n;
     if ($pt['up'] && $pt['lldp'] && is_numeric($pt['lldp']['mfs']) && $pt['mtu'] > (int)$pt['lldp']['mfs'])
-      $add('info', "$n: MTU {$pt['mtu']} is larger than the maximum frame size the switch reports ({$pt['lldp']['mfs']}).", $n);
+      $add('info', "$n: MTU {$pt['mtu']} is larger than the maximum frame size the switch reports ({$pt['lldp']['mfs']}).", $n, "mtu|$n", "{$pt['mtu']}|{$pt['lldp']['mfs']}");
   }
   foreach ($rings as $what => $who)
-    $add('info', implode(', ', $who) . ": ring buffers are below the maximum ($what). Larger rings absorb bursts at some memory and latency cost (ethtool -G).", $who[0]);
+    $add('info', implode(', ', $who) . ": ring buffers are below the maximum ($what). Larger rings absorb bursts at some memory and latency cost (ethtool -G).", $who[0], 'ring|' . implode(',', $who), $what);
 
   foreach ($m['bonds'] as $bn => $b) {
     $up = array_filter($b['slaves'], fn($s) => $s['mii'] === 'up');
-    if ($b['mii'] !== 'up') $add('crit', "$bn: bond is " . ($b['mii'] ?: 'down'), $bn);
+    if ($b['mii'] !== 'up') $add('crit', "$bn: bond is " . ($b['mii'] ?: 'down'), $bn, "bond|$bn|mii", $b['mii']);
     foreach ($b['slaves'] as $sn => $s) {
-      if ($s['mii'] !== 'up') $add(count($up) ? 'warn' : 'crit', "$bn: member $sn is " . ($s['mii'] ?: 'down'), $bn);
-      if (($s['failures_delta'] ?? 0) > 0) $add('warn', "$bn: member $sn lost link {$s['failures_delta']} time" . ($s['failures_delta'] > 1 ? 's' : '') . " $win", $bn);
-      elseif ($s['failures'] > 0) $add('info', "$bn: member $sn has {$s['failures']} link failures since boot", $bn);
+      if ($s['mii'] !== 'up') $add(count($up) ? 'warn' : 'crit', "$bn: member $sn is " . ($s['mii'] ?: 'down'), $bn, "bond|$bn|$sn|mii", $s['mii']);
+      if (($s['failures_delta'] ?? 0) > 0) $add('warn', "$bn: member $sn lost link {$s['failures_delta']} time" . ($s['failures_delta'] > 1 ? 's' : '') . " $win", $bn, "bond|$bn|$sn|fail", $s['failures']);
+      elseif ($s['failures'] > 0) $add('info', "$bn: member $sn has {$s['failures']} link failures since boot", $bn, "bond|$bn|$sn|fail", $s['failures']);
       foreach (['actor', 'partner'] as $side) if ($s["{$side}_churn"] === 'churned')
-        $add('warn', "$bn: member $sn $side churn state is churned (LACP is not settling)", $bn);
+        $add('warn', "$bn: member $sn $side churn state is churned (LACP is not settling)", $bn, "bond|$bn|$sn|churn|$side", '');
     }
     if (stripos($b['mode'], '802.3ad') !== false) {
-      if ($up && ($b['partner_mac'] === '' || $b['partner_mac'] === '00:00:00:00:00:00')) $add('warn', "$bn: no LACP partner (the switch ports are not running LACP)", $bn);
+      if ($up && ($b['partner_mac'] === '' || $b['partner_mac'] === '00:00:00:00:00:00')) $add('warn', "$bn: no LACP partner (the switch ports are not running LACP)", $bn, "bond|$bn|partner", '');
       foreach ($up as $sn => $s) {
         if ($b['agg'] !== null && $s['agg'] !== null && $s['agg'] !== $b['agg'])
-          $add('warn', "$bn: $sn is in aggregator {$s['agg']}, not the active aggregator {$b['agg']}, so it carries no traffic (the switch puts it in a different LAG or none)", $bn);
+          $add('warn', "$bn: $sn is in aggregator {$s['agg']}, not the active aggregator {$b['agg']}, so it carries no traffic (the switch puts it in a different LAG or none)", $bn, "bond|$bn|$sn|agg", "{$s['agg']}|{$b['agg']}");
         elseif ($s['actor_state'] !== null && ($s['actor_state'] & 0x38) !== 0x38)
-          $add('warn', "$bn: $sn is not distributing (LACP state: " . net_lacp_state($s['actor_state']) . ')', $bn);
+          $add('warn', "$bn: $sn is not distributing (LACP state: " . net_lacp_state($s['actor_state']) . ')', $bn, "bond|$bn|$sn|dist", $s['actor_state']);
       }
       $partners = array_unique(array_filter(array_column($up, 'partner_mac'), fn($x) => $x !== '' && $x !== '00:00:00:00:00:00'));
-      if (count($partners) > 1) $add('warn', "$bn: members see different LACP partners (" . implode(', ', $partners) . ')', $bn);
-      if (preg_match('/^layer2\b/', $b['hash'])) $add('info', "$bn: transmit hash policy {$b['hash']} puts all traffic to one MAC (e.g. the router) on a single member; layer3+4 spreads flows.", $bn);
+      if (count($partners) > 1) $add('warn', "$bn: members see different LACP partners (" . implode(', ', $partners) . ')', $bn, "bond|$bn|partners", implode(',', $partners));
+      if (preg_match('/^layer2\b/', $b['hash'])) $add('info', "$bn: transmit hash policy {$b['hash']} puts all traffic to one MAC (e.g. the router) on a single member; layer3+4 spreads flows.", $bn, "bond|$bn|hash", $b['hash']);
     }
     $rs = [];
     foreach ($b['slaves'] as $sn => $s) if (!empty($m['ports'][$sn]['ring'])) $rs[$sn] = "RX {$m['ports'][$sn]['ring']['rx']}, TX {$m['ports'][$sn]['ring']['tx']}";
     if (count(array_unique($rs)) > 1)
-      $add('info', "$bn: members have different ring sizes (" . implode('; ', array_map(fn($k, $v) => "$k $v", array_keys($rs), $rs)) . ')', $bn);
+      $add('info', "$bn: members have different ring sizes (" . implode('; ', array_map(fn($k, $v) => "$k $v", array_keys($rs), $rs)) . ')', $bn, "bond|$bn|rings");
     $speeds = array_unique(array_filter(array_column($up, 'speed')));
-    if (count($speeds) > 1) $add('warn', "$bn: members run at different speeds (" . implode(', ', $speeds) . ')', $bn);
+    if (count($speeds) > 1) $add('warn', "$bn: members run at different speeds (" . implode(', ', $speeds) . ')', $bn, "bond|$bn|speeds", implode(',', $speeds));
   }
 
   $order = ['crit' => 0, 'warn' => 1, 'info' => 2];

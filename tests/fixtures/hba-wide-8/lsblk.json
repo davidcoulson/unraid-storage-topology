@@ -1,0 +1,20 @@
+{
+ "blockdevices": [
+  {
+   "name": "sdb",
+   "serial": "ZLTEST00",
+   "wwn": "0x5000c50090000000",
+   "tran": "sas",
+   "model": "ST16000NM002G",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdc",
+   "serial": "ZLTEST01",
+   "wwn": "0x5000c50090000100",
+   "tran": "sas",
+   "model": "ST16000NM002G",
+   "size": "14.6T"
+  }
+ ]
+}

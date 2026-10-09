@@ -1,0 +1,35 @@
+{
+ "Controllers": [
+  {
+   "Command Status": {
+    "CLI Version": "007.2807.0000.0000 Dec 22, 2023",
+    "Operating system": "Linux 6.12.24-Unraid",
+    "Controller": 0,
+    "Status": "Success",
+    "Description": "None"
+   },
+   "Response Data": {
+    "Enclosure /c0/e252 ": {
+     "Information": {
+      "Device ID": 252,
+      "Position": "1",
+      "Connector Name": "Unavailable",
+      "Enclosure Type": "SGPIO",
+      "Status": "OK",
+      "EnclLogicalID": "N/A"
+     },
+     "Properties": [
+      {
+       "EID": 252,
+       "State": "OK",
+       "Slots": 8,
+       "PD": 1,
+       "Port#": "-",
+       "ProdID": "SGPIO"
+      }
+     ]
+    }
+   }
+  }
+ ]
+}

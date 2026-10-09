@@ -1,0 +1,20 @@
+{
+ "blockdevices": [
+  {
+   "name": "sdb",
+   "serial": "ZDHTEST1",
+   "wwn": "0x5000c500a0000001",
+   "tran": "sas",
+   "model": "ST4000VN008-2DR166",
+   "size": "3.6T"
+  },
+  {
+   "name": "sdc",
+   "serial": "ZDHTEST2",
+   "wwn": "0x5000c500a0000002",
+   "tran": "sas",
+   "model": "ST4000VN008-2DR166",
+   "size": "3.6T"
+  }
+ ]
+}

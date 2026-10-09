@@ -1,0 +1,44 @@
+{
+ "blockdevices": [
+  {
+   "name": "sda",
+   "serial": "TESTUSB0001",
+   "wwn": "",
+   "tran": "usb",
+   "model": "Cruzer Fit",
+   "size": "28.7G"
+  },
+  {
+   "name": "sdb",
+   "serial": "TESTSSD0001",
+   "wwn": "0x500a0751e0000001",
+   "tran": "sata",
+   "model": "CT1000MX500SSD1",
+   "size": "931.5G"
+  },
+  {
+   "name": "sdc",
+   "serial": "TESTSSD0002",
+   "wwn": "0x500a0751e0000002",
+   "tran": "sata",
+   "model": "CT1000MX500SSD1",
+   "size": "931.5G"
+  },
+  {
+   "name": "sdf",
+   "serial": "WD-TESTDUO0001",
+   "wwn": "",
+   "tran": "usb",
+   "model": "My Book Duo 25F6",
+   "size": "16.4T"
+  },
+  {
+   "name": "sdg",
+   "serial": "WD-TESTBOOK001",
+   "wwn": "",
+   "tran": "usb",
+   "model": "My Book 25ED",
+   "size": "7.3T"
+  }
+ ]
+}

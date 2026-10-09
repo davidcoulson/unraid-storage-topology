@@ -1,0 +1,37 @@
+{
+ "Controllers": [
+  {
+   "Command Status": {
+    "CLI Version": "007.2807.0000.0000 Dec 22, 2023",
+    "Operating system": "Linux 6.12.24-Unraid",
+    "Controller": 0,
+    "Status": "Success",
+    "Description": "None"
+   },
+   "Response Data": {
+    "Basics": {
+     "Controller": 0,
+     "Model": "MegaRAID 9361-8i",
+     "Serial Number": "SKTEST0001",
+     "SAS Address": "500605b0deadbe00",
+     "PCI Address": "00:02:00:00"
+    },
+    "Version": {
+     "Firmware Package Build": "24.21.0-0151",
+     "Firmware Version": "4.680.00-8527",
+     "Bios Version": "6.36.00.3_4.19.08.00_0x06180203",
+     "Driver Name": "megaraid_sas",
+     "Driver Version": "07.727.03.00-rc1"
+    },
+    "Status": {
+     "Controller Status": "Optimal",
+     "Current Personality": "JBOD-Mode"
+    },
+    "HwCfg": {
+     "ROC temperature(Degree Celsius)": 61,
+     "On Board Memory Size": "1024MB"
+    }
+   }
+  }
+ ]
+}

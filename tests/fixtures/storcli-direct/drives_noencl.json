@@ -1,0 +1,56 @@
+{
+ "Controllers": [
+  {
+   "Command Status": {
+    "CLI Version": "007.2807.0000.0000 Dec 22, 2023",
+    "Operating system": "Linux 6.12.24-Unraid",
+    "Controller": 0,
+    "Status": "Success",
+    "Description": "None"
+   },
+   "Response Data": {
+    "Drive /c0/s5": [
+     {
+      "EID:Slt": " :5",
+      "DID": 3,
+      "State": "JBOD",
+      "DG": "-",
+      "Size": "3.638 TB",
+      "Intf": "SATA",
+      "Med": "HDD",
+      "Model": "ST4000VN008-2DR166",
+      "Type": "JBOD"
+     }
+    ],
+    "Drive /c0/s5 - Detailed Information": {
+     "Drive /c0/s5 State": {
+      "Media Error Count": 0,
+      "Other Error Count": 0,
+      "Drive Temperature": " 33C (91.40 F)",
+      "Predictive Failure Count": 0,
+      "S.M.A.R.T alert flagged by drive": "No"
+     },
+     "Drive /c0/s5 Device attributes": {
+      "SN": "ZDHTEST2",
+      "Manufacturer Id": "ATA     ",
+      "Model Number": "ST4000VN008-2DR166",
+      "WWN": "5000C500A0000001",
+      "Firmware Revision": "SC60",
+      "Device Speed": "6.0Gb/s",
+      "Link Speed": "6.0Gb/s"
+     },
+     "Drive /c0/s5 Policies/Settings": {
+      "Port Information": [
+       {
+        "Port": 0,
+        "Status": "Active",
+        "Linkspeed": "6.0Gb/s",
+        "SAS address": "0x4433221103000000"
+       }
+      ]
+     }
+    }
+   }
+  }
+ ]
+}

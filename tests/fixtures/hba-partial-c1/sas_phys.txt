@@ -1,0 +1,16 @@
+phy-0:0|12.0 Gbit|12.0 Gbit|0x500605b0abcd0000|port-0:0|expander-0:0=0x5003048000a1b2bf|12.0 Gbit
+phy-0:1|12.0 Gbit|12.0 Gbit|0x500605b0abcd0000|port-0:0|expander-0:0=0x5003048000a1b2bf|12.0 Gbit
+phy-0:2|12.0 Gbit|12.0 Gbit|0x500605b0abcd0000|port-0:0|expander-0:0=0x5003048000a1b2bf|12.0 Gbit
+phy-0:3|12.0 Gbit|12.0 Gbit|0x500605b0abcd0000|port-0:0|expander-0:0=0x5003048000a1b2bf|12.0 Gbit
+phy-0:4|12.0 Gbit|12.0 Gbit|0x500605b0abcd0000|port-0:0|expander-0:0=0x5003048000a1b2bf|12.0 Gbit
+phy-0:5|12.0 Gbit|12.0 Gbit|0x500605b0abcd0000|port-0:0|expander-0:0=0x5003048000a1b2bf|12.0 Gbit
+phy-0:6|Unknown|12.0 Gbit|0x500605b0abcd0000|||12.0 Gbit
+phy-0:7|Unknown|12.0 Gbit|0x500605b0abcd0000|||12.0 Gbit
+phy-0:8|Unknown|12.0 Gbit|0x500605b0abcd0000|||12.0 Gbit
+phy-0:9|Unknown|12.0 Gbit|0x500605b0abcd0000|||12.0 Gbit
+phy-0:10|Unknown|12.0 Gbit|0x500605b0abcd0000|||12.0 Gbit
+phy-0:11|Unknown|12.0 Gbit|0x500605b0abcd0000|||12.0 Gbit
+phy-0:12|Unknown|12.0 Gbit|0x500605b0abcd0000|||12.0 Gbit
+phy-0:13|Unknown|12.0 Gbit|0x500605b0abcd0000|||12.0 Gbit
+phy-0:14|Unknown|12.0 Gbit|0x500605b0abcd0000|||12.0 Gbit
+phy-0:15|Unknown|12.0 Gbit|0x500605b0abcd0000|||12.0 Gbit

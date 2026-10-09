@@ -1,0 +1,3 @@
+[0:0:0:0]    enclosu LSI      SAS3x40          0717  -          /dev/sg20
+[0:0:1:0]    disk    SEAGATE  ST16000NM002G    E004  /dev/sdb   /dev/sg0
+[0:0:2:0]    disk    SEAGATE  ST16000NM002G    E004  /dev/sdc   /dev/sg1

@@ -1,0 +1,24 @@
+phy-0:0|6.0 Gbit|12.0 Gbit|0x500605b012345600|port-0:0|end_device-0:0=0x4433221100000000|12.0 Gbit
+phy-0:1|6.0 Gbit|12.0 Gbit|0x500605b012345600|port-0:1|end_device-0:1=0x4433221100000001|12.0 Gbit
+phy-0:2|6.0 Gbit|12.0 Gbit|0x500605b012345600|port-0:2|end_device-0:2=0x4433221100000002|12.0 Gbit
+phy-0:3|6.0 Gbit|12.0 Gbit|0x500605b012345600|port-0:3|end_device-0:3=0x4433221100000003|12.0 Gbit
+phy-0:4|6.0 Gbit|12.0 Gbit|0x500605b012345600|port-0:6|expander-0:0=0x500605b0000a1b3f|12.0 Gbit
+phy-0:5|6.0 Gbit|12.0 Gbit|0x500605b012345600|port-0:6|expander-0:0=0x500605b0000a1b3f|12.0 Gbit
+phy-0:6|6.0 Gbit|12.0 Gbit|0x500605b012345600|port-0:6|expander-0:0=0x500605b0000a1b3f|12.0 Gbit
+phy-0:7|6.0 Gbit|12.0 Gbit|0x500605b012345600|port-0:6|expander-0:0=0x500605b0000a1b3f|12.0 Gbit
+phy-0:8|6.0 Gbit|12.0 Gbit|0x500605b012345600|port-0:4|end_device-0:4=0x4433221100000008|12.0 Gbit
+phy-0:9|6.0 Gbit|12.0 Gbit|0x500605b012345600|port-0:5|end_device-0:5=0x4433221100000009|12.0 Gbit
+phy-0:10|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit
+phy-0:11|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit
+phy-0:12|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit
+phy-0:13|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit
+phy-0:14|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit
+phy-0:15|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit
+phy-0:16|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit
+phy-0:17|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit
+phy-0:18|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit
+phy-0:19|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit
+phy-0:20|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit
+phy-0:21|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit
+phy-0:22|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit
+phy-0:23|Unknown|12.0 Gbit|0x500605b012345600|||12.0 Gbit

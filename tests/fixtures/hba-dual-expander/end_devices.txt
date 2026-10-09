@@ -1,0 +1,4 @@
+end_device-0:0:0|0x5003048000a1b2bd|ssp|port-0:0:0|phy-0:0:39|0:0:0:0|13|LSI|SAS3x28|
+end_device-0:0:1|0x5000c50090000001|ssp|port-0:0:1|phy-0:0:10|0:0:1:0|0|SEAGATE|ST16000NM002G|sdb
+end_device-0:0:2|0x5000c50090000101|ssp|port-0:0:2|phy-0:0:11|0:0:2:0|0|SEAGATE|ST16000NM002G|sdc
+end_device-0:1:0|0x5003048000a1b2fd|ssp|port-0:1:0|phy-0:1:39|0:0:3:0|13|LSI|SAS3x28|

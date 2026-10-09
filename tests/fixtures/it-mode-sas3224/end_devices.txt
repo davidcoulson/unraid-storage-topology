@@ -1,0 +1,20 @@
+end_device-0:0|0x4433221100000000|sata|port-0:0|phy-0:0|0:0:0:0|0|ATA|SAMSUNG MZ7LM1T9|sda
+end_device-0:1|0x4433221100000001|sata|port-0:1|phy-0:1|0:0:1:0|0|ATA|SAMSUNG MZ7LM1T9|sdb
+end_device-0:2|0x4433221100000002|sata|port-0:2|phy-0:2|0:0:2:0|0|ATA|SAMSUNG MZ7LM1T9|sdc
+end_device-0:3|0x4433221100000003|sata|port-0:3|phy-0:3|0:0:3:0|0|ATA|SAMSUNG MZ7LM1T9|sdd
+end_device-0:4|0x4433221100000008|sata|port-0:4|phy-0:8|0:0:4:0|0|ATA|SAMSUNG MZ7LM1T9|sde
+end_device-0:5|0x4433221100000009|sata|port-0:5|phy-0:9|0:0:5:0|0|ATA|SAMSUNG MZ7LM1T9|sdf
+end_device-0:0:0|0x5000cca250000001|ssp|port-0:0:0|phy-0:0:8|0:0:6:0|0|HGST|HUH721010AL5200|sdh
+end_device-0:0:1|0x5000cca250000005|ssp|port-0:0:1|phy-0:0:9|0:0:7:0|0|HGST|HUH721010AL5200|sdi
+end_device-0:0:2|0x5000cca250000009|ssp|port-0:0:2|phy-0:0:10|0:0:8:0|0|HGST|HUH721010AL5200|sdj
+end_device-0:0:3|0x5000cca25000000d|ssp|port-0:0:3|phy-0:0:11|0:0:9:0|0|HGST|HUH721010AL5200|sdk
+end_device-0:0:4|0x5000cca250000011|ssp|port-0:0:4|phy-0:0:12|0:0:10:0|0|HGST|HUH721010AL5200|sdl
+end_device-0:0:5|0x5000cca250000015|ssp|port-0:0:5|phy-0:0:13|0:0:11:0|0|HGST|HUH721010AL5200|sdm
+end_device-0:0:6|0x5000cca250000019|ssp|port-0:0:6|phy-0:0:14|0:0:12:0|0|HGST|HUH721010AL5200|sdn
+end_device-0:0:7|0x5000cca25000001d|ssp|port-0:0:7|phy-0:0:15|0:0:13:0|0|HGST|HUH721010AL5200|sdo
+end_device-0:0:8|0x5000cca250000021|ssp|port-0:0:8|phy-0:0:16|0:0:14:0|0|HGST|HUH721010AL5200|sdp
+end_device-0:0:9|0x5000cca250000025|ssp|port-0:0:9|phy-0:0:17|0:0:15:0|0|HGST|HUH721010AL5200|sdq
+end_device-0:0:10|0x5000cca250000029|ssp|port-0:0:10|phy-0:0:18|0:0:16:0|0|HGST|HUH721010AL5200|sdr
+end_device-0:0:11|0x5000cca25000002d|ssp|port-0:0:11|phy-0:0:19|0:0:17:0|0|HGST|HUH721010AL5200|sds
+end_device-0:0:12|0x500605b0000a1b3d|ssp|port-0:0:12|phy-0:0:28|0:0:18:0|13|LSI CORP|SAS2X28|
+end_device-0:0:13|0x500605b0000a1b14|sata|port-0:0:13|phy-0:0:20|0:0:19:0|0|ATA|SAMSUNG MZ7LM1T9|sdg

@@ -1,0 +1,2 @@
+[0:2:3:0]    disk    ATA      ST4000VN008-2DR1 SC60  /dev/sdb   /dev/sg1
+[0:2:5:0]    disk    ATA      ST4000VN008-2DR1 SC60  /dev/sdc   /dev/sg2

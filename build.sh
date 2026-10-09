@@ -13,6 +13,8 @@ for f in "$PLUG"/include/*.php; do
   if command -v php >/dev/null; then php -l "$f" >/dev/null; fi
 done
 for f in "$PLUG"/scripts/*.sh; do bash -n "$f"; done
+# Model tests on the synthetic fixtures in tests/ (skipped when PHP is not installed, e.g. on a Mac without it).
+if command -v php >/dev/null; then php tests/run.php; else echo "php not found: skipping tests/run.php"; fi
 
 chmod 755 "$PLUG/scripts/"*.sh
 find "$SRC" -type d -exec chmod 755 {} +

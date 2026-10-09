@@ -8,8 +8,15 @@ Two read-only pages in **Tools → System Information**:
 
 ## Storage Topology
 
-- **Controllers**: model, firmware, BIOS, driver, mode, chip temperature, and each port's width and per-lane
-  link rate, with what is attached to it.
+- **Controllers**: model, firmware, BIOS, driver, mode, chip temperature, and each port's width (wide ports
+  called out), per-lane link rate and what is attached to it: a shelf I/O module or expander, or the disk itself
+  (Unraid name, /dev name and model) for drives straight on the HBA.
+- **Connectors**: per SFF-8643/8644 connector (4 PHYs each, derived from PHY numbers, so C0, C1, ... may not match
+  the labels on the card), how many lanes are linked, at what rate, to which port and device. Unused PHYs are listed
+  per connector.
+- **Directly attached drives**: drives that are in no enclosure bay (on an HBA PHY, on an expander PHY that no SES
+  bay points to, or on a MegaRAID controller without an enclosure or in a virtual one such as EID 252), with port,
+  disk, model, size, temperature and link rate.
 - **Cable map**: which controller port goes to which shelf I/O module port, and shelf-to-shelf cables,
   with cable vendor, part and serial where the enclosure reports them.
 - **Disk shelves**: I/O modules (status, firmware, serial), power supplies (status, firmware, rating),
@@ -18,11 +25,24 @@ Two read-only pages in **Tools → System Information**:
   temperature, negotiated vs maximum link rate, both SAS paths, and media/other/predictive-failure counts.
 - **Firmware overview**: every controller, I/O module, PSU and drive model with its versions; parts of the
   same kind running different versions are highlighted.
-- **Problems list**: failed or degraded elements, firmware mismatches, narrow or slow links, single paths,
-  drive errors, and over-temperature enclosures (including NVMe switch cards that expose SES).
+- **Simple enclosures**: USB drive boxes and enclosures that only support the SES short status page (one status
+  byte: overall status only, no per-bay, fan or PSU detail), shown with their disks.
+- **Problems list**: failed or degraded elements (with plain-language PSU messages such as "no AC input"), firmware
+  mismatches, partially linked connectors, slow links, single paths, drive errors, and over-temperature enclosures
+  (including NVMe switch cards that expose SES). Link rates are judged against what both ends support: an expander's
+  PHY maximum (e.g. 6 Gb/s for SAS2 expanders), 6 Gb/s for SATA drives; SAS drives that do not report their maximum
+  are not judged.
+- **Acknowledge**: each problem can be acknowledged. It then moves to a collapsed "Acknowledged" list and no
+  longer counts toward the page status, until what it reports changes (a status, a flag, a counter), when it shows
+  again. Acknowledgements are kept in `/boot/config/plugins/storage-topology/acks.json`. Same on the network page.
+- **Download diagnostics**: a `.tar.gz` of everything both pages collected, with plugin, Unraid, kernel, sg_ses and
+  storcli versions, for bug reports. "Anonymise" (on by default) replaces serial numbers, WWNs, SAS addresses, MAC
+  addresses, the hostname and LLDP switch names consistently, so the topology stays readable, and reduces
+  `disks.ini`/`devs.ini` to name, device, type and status.
 
-Nothing is changed on the system: the plugin only runs `storcli … show … J nolog`, `sg_ses` status pages,
-`lsscsi`, `lsblk`, and reads sysfs and emhttp's `disks.ini`.
+Nothing is changed on the system: the plugin only runs `storcli … show … J nolog`, `sg_ses` status and
+configuration pages, `lsscsi`, `lsblk`, and reads sysfs and emhttp's `disks.ini`. The only file it writes outside
+its RAM cache is `acks.json`, and only when you press Acknowledge.
 
 ## Network Topology
 
@@ -65,9 +85,11 @@ The network page only runs `ethtool` queries (settings, `-i`, `-m`, `-S`, `-g`, 
   `lspci` ship with Unraid.
 - Optional: Broadcom/LSI `storcli` (or `storcli64`) for controller, port and per-drive detail. It is looked
   for in `/sbin`, `/usr/sbin`, `/usr/local/sbin`, `/usr/bin`, `/usr/local/bin` and `/opt/MegaRAID/storcli`.
-  Without it the page uses the kernel's view: SAS HBA PHYs and link rates from `/sys/class/sas_phy`, and
-  bay-to-disk mapping from `/sys/class/enclosure`. MegaRAID controllers hide their SAS layer from the kernel,
-  so they need storcli.
+  Without it the page uses the kernel's view: SAS HBA and expander PHYs and link rates from `/sys/class/sas_phy`,
+  expanders and end devices from `/sys/class/sas_expander` and `/sys/class/sas_device`, and bay-to-disk mapping
+  from `/sys/class/enclosure`. MegaRAID controllers hide their SAS layer from the kernel, so they need storcli.
+  storcli also works with LSI/Broadcom HBAs in IT mode (SAS3008, SAS3224, SAS3408 and later); the page then shows the
+  HBA's model, firmware and, on chips with a sensor (e.g. 9400/9500 series), its temperature. lsiutil is not used.
 
 ## How it collects
 
@@ -91,14 +113,16 @@ A full network collection takes about a second (the `mstflint` query is the slow
 
 - Broadcom MegaRAID 9580-8i8e in JBOD mode with two NetApp DS424 (IOM12) shelves, multipathed.
 - HighPoint Rocket 1528D NVMe switch card (SES temperature, fan and slot status).
+- From user reports and synthetic test fixtures (`tests/`): LSI SAS9305-24i in IT mode with SATA SSDs on the HBA
+  and an LSI SAS2X28 expander backplane, 9400-16i-like wide ports and dual-expander backplanes, EMC KTN-STL3 (VNX
+  DAE, named from the SES configuration page), WD My Book USB enclosures (short status page only).
 - Network: NVIDIA/Mellanox ConnectX-6 Dx dual-port 100G (mlx5) in an 802.3ad bond with 100G AOC cables and LLDP
   from the ulldpd plugin, Aquantia AQC113 10GBASE-T (atlantic), Intel AX210 Wi-Fi. SFP/SFP+ modules, other drivers'
   counter names and other bond modes are handled from the documented `ethtool`/bonding formats but have had less
   real-hardware testing.
 
-The kernel-view path for LSI HBAs in IT mode (mpt3sas) is implemented but has not been tested on real
-IT-mode hardware yet. Reports and fixtures from other controllers and enclosures are very welcome: please
-open an issue with the output of the commands above (remove serial numbers if you prefer).
+Reports from other controllers and enclosures are very welcome: please open an issue (or post in the forum
+thread) and attach the file from **Download diagnostics**, anonymised if you prefer.
 
 Labels such as "IOM A/B", port numbers and cable details come from the enclosure's SES element order and
 NetApp's descriptor format. Other enclosures still get status and sensors, with fewer labels.
@@ -119,12 +143,19 @@ https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/stor
 ## Build a release
 
 ```bash
-./build.sh 2026.10.10
+./build.sh 2026.10.11
 ```
 
-This builds `archive/storage-topology-<version>-x86_64-1.txz` and stamps the version and MD5 into
+This runs the tests (`php tests/run.php`, when PHP is installed), builds `archive/storage-topology-<version>-x86_64-1.txz` and stamps the version and MD5 into
 `storage-topology.plg`. Add a `<CHANGES>` entry, commit, push, and attach the `.txz` to a GitHub release
 tagged with the version.
+
+## Tests
+
+`tests/fixtures/` holds synthetic collector output (made by `tests/make_fixtures.py`, no real serials or addresses)
+for layouts the author's server does not have. `php tests/run.php` loads each through the page's model, checks the
+problems list, acknowledgements (against a temporary store), anonymisation, and renders the page with all PHP
+notices enabled.
 
 ## License
 
