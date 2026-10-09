@@ -1,0 +1,1 @@
+[1:0:15:0]   enclosu EMC      ESES Enclosure   0001  -          /dev/sg3

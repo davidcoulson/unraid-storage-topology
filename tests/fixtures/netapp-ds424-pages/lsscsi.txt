@@ -1,0 +1,1 @@
+[1:0:113:0]  enclosu NETAPP   DS424IOM12A      0281  -          /dev/sg4

@@ -168,6 +168,82 @@ t(!matching($m, '/I\/O modules answer SES/'), 'LCCs sharing one SES device is no
 t($s && $s['fault_led'] && $m['shelves'][$s['key']]['fault_explained'], 'shelf header gets the fault LED note');
 $m0 = topo_load("$fx/emc-ktn-stl3");
 t(!array_filter($m0['shelves'][$s['key']]['ioms'], fn($i) => $i['fw'] === ''), 'no blank I/O module firmware');
+t($s && !array_filter(array_merge(...array_values($s['groups'])), fn($x) => $x['desc'] !== ''), 'sg_ses\'s "<null>" descriptor (no page 7) reads as empty');
+
+// ---------------------------------------------------------------------------------------------------------
+$section = 'ses-join-fallback';
+// What the page reads from an element list: type, number, overall/individual, descriptor, status, bay number and
+// the bay's SAS addresses. (Fan speeds, temperatures, voltages and currents are live readings: the pages and the join
+// of the real fixture were read milliseconds apart, so those may differ.)
+function ses_view(array $els): array {
+  return array_map(function ($e) {
+    $sd = $e['status_descriptor'] ?? []; $ae = $e['additional_element_status_descriptor'] ?? [];
+    $phys = array_values(array_filter(array_map(fn($p) => topo_addr($p['sas_address'] ?? ''), $ae['phy_descriptor_list'] ?? []), fn($a) => trim($a, '0') !== ''));
+    return [$e['element_type']['i'], $e['element_number'], $e['individual'], $e['descriptor'], $sd['status']['meaning'] ?? '',
+            $ae['device_slot_number'] ?? $sd['slot_address'] ?? null, $phys];
+  }, $els);
+}
+$dir = "$fx/netapp-ds424-pages";
+$real = topo_json("$dir/ses_sg4.json")['join_of_diagnostic_pages']['element_list'];
+$pages = fn($aes = null, $ed = true) => topo_ses_join(topo_json("$dir/sescfg_sg4.json"), topo_json("$dir/sesstat_sg4.json"),
+                                                       $ed ? topo_json("$dir/sesdesc_sg4.json") : null, $aes ?? topo_json("$dir/sesaes_sg4.json"));
+$built = $pages();
+t(is_array($built) && count($built) === count($real) && count($real) > 100, 'DS424: one row per element (' . count($real) . ')');
+t(ses_view($built) === ses_view($real), 'DS424: joining pages 1, 2, 7 and 0Ah gives what sg_ses --json --join gives');
+$occupied = fn($els) => count(array_filter(ses_view($els), fn($v) => $v[0] === 1 && $v[2] && $v[6]));
+t($occupied($real) >= 20 && $occupied($built) === $occupied($real), 'DS424: every occupied bay has its SAS address (' . $occupied($real) . ')');
+// Additional element status descriptors are the join's, except empty bays (page 0Ah flags them invalid, without detail).
+$aesOf = fn($els) => array_map(fn($e) => $e['additional_element_status_descriptor'], array_filter($els, fn($e) => !empty($e['additional_element_status_descriptor'])
+  && ($e['additional_element_status_descriptor']['phy_descriptor_list'][0]['phy_index'] ?? 0) !== 255));
+t($aesOf($built) === $aesOf($real), 'DS424: additional element status descriptors equal the join\'s');
+// The other ways of matching page 0Ah to elements give the same join: EIP=0 (in order) and EIIOE=1 (index counts overall elements).
+$aes = topo_json("$dir/sesaes_sg4.json");
+$noEip = $aes; $eiioe1 = $aes;
+$indIdx = array_keys(array_filter($built, fn($e) => $e['individual']));
+$L = 'additional_element_status_diagnostic_page'; $G = 'additional_element_status_by_element_type_list'; $D = 'additional_element_status_descriptor_list';
+foreach ($aes[$L][$G] as $g => $grp) foreach ($grp[$D] as $i => $d) {
+  $x = &$noEip[$L][$G][$g][$D][$i]['additional_element_status_descriptor'];
+  $x['eip'] = 0; unset($x['element_index']); unset($x);
+  $y = &$eiioe1[$L][$G][$g][$D][$i]['additional_element_status_descriptor'];
+  $y['element_index'] = $indIdx[$y['element_index']]; unset($y);
+}
+t($pages($noEip) === $built, 'page 0Ah without element indexes (EIP=0) is matched in order');
+t($pages($eiioe1) === $built, 'page 0Ah whose element indexes count overall elements (EIIOE=1) is recognised');
+$no7 = $pages(null, false);
+t(is_array($no7) && ($no7[1]['descriptor'] ?? '') === '<null>' && $occupied($no7) === $occupied($real), 'page 7 is optional ("<null>" descriptors, as sg_ses writes them)');
+t(topo_ses_join(null, topo_json("$dir/sesstat_sg4.json"), null, null) === null && topo_ses_join(topo_json("$dir/sescfg_sg4.json"), null, null, null) === null, 'pages 1 and 2 are required');
+// The page model from the separate pages (--join crashed) equals the one from --join, live readings aside.
+$d2 = "$tmp/ds424-pages";
+copy_dir($dir, $d2);
+file_put_contents("$d2/ses_sg4.json", '');
+file_put_contents("$d2/timings", str_replace('ses_sg4.json|0|', 'ses_sg4.json|139|', file_get_contents("$d2/timings")));
+$mj = load($dir); $mp = load($d2);
+// (Empty bays: the join decodes their invalid page 0Ah descriptor to a zero address, the pages leave it out.)
+$shelf = fn($m) => array_map(fn($s) => ['label' => $s['label'], 'serial' => $s['serial'], 'status' => $s['status'], 'ioms' => $s['ioms'],
+  'groups' => array_map(fn($g) => array_map(fn($x) => ['phys' => array_values(array_filter($x['phys'] ?? [], fn($a) => trim($a, '0') !== ''))]
+    + array_diff_key($x, array_flip(['value', 'rpm', 'code'])), $g), $s['groups'])], $m['shelves']);
+t(count($mj['shelves']) === 1 && $shelf($mp) === $shelf($mj), 'DS424: shelf, I/O modules, PSUs, sensors, connectors and bays are the same from the pages');
+t(texts($mp) === texts($mj) && !matching($mp, '/^Collection/'), 'DS424: same problems, and the failed --join is not a collection problem: ' . dump_problems($mp));
+$s = reset($mp['shelves']);
+t($s && count($s['ioms']) === 2 && $s['ioms'][0]['fw'] !== '' && count($s['groups']['psu']) === 4 && count($s['groups']['slot']) === 24, 'DS424 from pages: 2 IOMs with firmware, 4 PSUs, 24 bays');
+
+// EMC KTN-STL3 where sg_ses --json --join crashes: pages 1, 2 and 0Ah, no page 7.
+$mj = load("$fx/emc-ktn-stl3"); $mp = load("$fx/emc-ktn-stl3-pages");
+$named = fn($m) => array_map(fn($s) => ['ioms' => array_column($s['ioms'], 'name'), 'fw' => array_column($s['ioms'], 'fw'),
+  'names' => array_map(fn($g) => array_map(fn($x) => [$x['name'], $x['status'], $x['level'], $x['slot'] ?? null, $x['phys'] ?? null], $g), $s['groups'])], $m['shelves']);
+t(count($mp['shelves']) === 1 && $named($mp) === $named($mj), 'EMC from pages: same named elements as from --join');
+$crit = array_values(array_filter($mp['problems'], fn($p) => $p['level'] === 'crit'));
+t(count($crit) === 1 && str_contains($crit[0]['text'], 'PSU B: no AC input') && texts($mp) === texts($mj), 'EMC from pages: PSU B without AC, same problems as --join: ' . dump_problems($mp));
+t(!matching($mp, '/^Collection/'), 'EMC from pages: --join exit 139, no page 7 and DID_SOFT_ERROR on stderr are not collection problems');
+$s = reset($mp['shelves']);
+t($s && count(array_filter($s['groups']['slot'], fn($x) => $x['phys'])) === 15, 'EMC from pages: 15 bays with SAS addresses from page 0Ah');
+// Without the status page there is nothing to show: that is reported.
+$d3 = "$tmp/emc-nostat";
+copy_dir("$fx/emc-ktn-stl3-pages", $d3);
+unlink("$d3/sesstat_sg3.json");
+file_put_contents("$d3/timings", str_replace('sesstat_sg3.json|0|', 'sesstat_sg3.json|5|', file_get_contents("$d3/timings")));
+$m3 = load($d3);
+t(!$m3['shelves'] && matching($m3, '/Collection: ses_sg3\.json: exit 139/') && matching($m3, '/Collection: sesstat_sg3\.json: exit 5/') && matching($m3, '/sg3: no SES data/'), 'both failing is reported: ' . dump_problems($m3));
 
 // ---------------------------------------------------------------------------------------------------------
 $section = 'anonymise';
@@ -186,6 +262,16 @@ $all = implode("\n", array_map(fn($f) => file_get_contents("$d2/$f"), $files));
 t(!str_contains($all, 'S2TVNX0TEST') && !str_contains($all, '7JTEST') && str_contains($all, 'SN0001'), 'serials replaced');
 t(!preg_match('/500605b0000a1b3f|500605b012345600|5000cca2500000/i', $all), 'SAS addresses and WWNs replaced');
 t(!str_contains($all, (string)0x5000cca250000001) && !str_contains($all, (string)0x500605b0000a1b3f), 'decimal SAS addresses (sg_ses JSON) replaced');
+// Serials spelled out in the SES configuration page's vendor-specific hex (EMC KTN-STL3, NetApp) become same-length tokens.
+$hexOf = fn($s) => implode(' ', str_split(bin2hex($s), 2));
+$cfgText = '{"vendor_specific_enclosure_information": "' . $hexOf("\x07\x80AB\x00CF99X1234567890\x00\x00 155 SXP 24x6Gsec\x00") . '", "x": "SN=QQ7TEST12345;"}';
+$st3 = st_anon_new([], 0);
+st_anon_scan($st3, 'sescfg_sg3.json', $cfgText);
+$out = st_anon_text($st3, 'sescfg_sg3.json', $cfgText);
+preg_match('/"vendor_specific_enclosure_information": "([^"]+)"/', $out, $mm);
+$bin = hex2bin(str_replace(' ', '', $mm[1] ?? ''));
+t(!str_contains($bin, 'CF99X1234567890') && str_contains($bin, '155 SXP 24x6Gsec') && strlen($bin) === 40 && preg_match('/SN000\d0{9}/', $bin)
+  && !str_contains($out, 'QQ7TEST12345'), 'serials in vendor-specific hex replaced, firmware strings and length kept: ' . json_encode($bin));
 $m = load($d2);
 t(count($m['direct']) === 7 && count(reset($m['shelves'])['drives']) === 12, 'anonymised data still loads: 7 direct, 12 in bays');
 t(str_starts_with(array_values(array_filter($m['controllers'][0]['ports'], fn($p) => $p['expander']))[0]['attached_label'] ?? '', 'Shelf sg18 expander'), 'expander still matched to its shelf');
@@ -194,6 +280,16 @@ t(substr($x1, 3, 16) === strtoupper(substr($x2, 18, 16)), 'the same address gets
 $st2 = st_anon_new(['tower', 'nas7'], 0);
 $a = st_anon_text($st2, 'x', "aa:bb:cc:11:22:33 AA:BB:CC:11:22:33 00:00:00:00:00:00 tower NAS7.local 0x5000c500abcd1224 5000C500ABCD1225");
 t($a === 'aa:bb:cc:00:00:01 AA:BB:CC:00:00:01 00:00:00:00:00:00 tower host1.local 0x5000c50000011224 5000C50000011225', 'MACs, hostnames and SAS addresses map consistently (default name "tower" kept): ' . $a);
+
+// ---------------------------------------------------------------------------------------------------------
+$section = 'ack-js';
+// The webGUI never answers multipart/form-data POSTs: the Acknowledge script must send URL-encoded form data, with
+// csrf_token in the body, and report failures next to the link rather than with alert().
+$js = st_problems_js('TESTTOKEN');
+t(str_contains($js, 'new URLSearchParams()') && !str_contains($js, 'FormData'), 'Acknowledge posts URL-encoded data (URLSearchParams), not FormData');
+t(str_contains($js, "append('csrf_token'") && str_contains($js, '"TESTTOKEN"'), 'csrf_token is sent in the body');
+t(!preg_match('/\balert\s*\(/', $js) && str_contains($js, 'Could not save: '), 'failures are shown next to the link, not with alert()');
+t(str_contains(st_diag_html(), "href='/plugins/storage-topology/include/diagnostics.php?anon=1'"), 'diagnostics is a plain GET link');
 
 // ---------------------------------------------------------------------------------------------------------
 $section = 'render';

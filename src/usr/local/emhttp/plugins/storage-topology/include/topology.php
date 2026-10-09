@@ -1,8 +1,8 @@
 <?PHP
 /* Storage topology model for StorageTopology.page.
- * Reads what scripts/collect.sh left in the cache folder (storcli JSON, sg_ses --join JSON, lsscsi, lsblk,
- * the kernel's enclosure and SAS sysfs, disks.ini) and returns one array: controllers with ports and connectors,
- * shelves with I/O modules, power, cooling, sensors, cables and bays, drives mapped to Unraid disk names, drives
+ * Reads what scripts/collect.sh left in the cache folder (storcli JSON, sg_ses --join JSON or the SES pages it joins,
+ * lsscsi, lsblk, the kernel's enclosure and SAS sysfs, disks.ini) and returns one array: controllers with ports and
+ * connectors, shelves with I/O modules, power, cooling, sensors, cables and bays, drives mapped to Unraid disk names, drives
  * that are not in any bay (direct-attached), simple enclosures (USB boxes, short-status-only SES), and a list of
  * problems. No commands run here.
  *
@@ -94,11 +94,16 @@ function topo_load(string $dir = TOPO_CACHE): array {
   foreach (@file("$dir/timings", FILE_IGNORE_NEW_LINES) ?: [] as $l) {
     [$name, $rc, $ms] = array_pad(explode('|', $l), 3, '');
     $m['timings'][$name] = ['rc' => (int)$rc, 'ms' => (int)$ms];
-    if ((int)$rc === 0) continue;
+  }
+  foreach ($m['timings'] as $name => ['rc' => $rc]) {
+    if ($rc === 0) continue;
     // An enclosure that only has the short status page is supported (see topo_ses), not a failed collection.
     $err = trim((string)@file_get_contents("$dir/$name.err"));
     if (preg_match('/^ses_(sg\d+)\.json$/', $name, $mm) && (is_file("$dir/ses_{$mm[1]}.short") || stripos($err, 'only supports Short enclosure status') !== false)) continue;
-    if (str_starts_with($name, 'sescfg_')) continue;          // optional: only adds names and subenclosure revisions
+    // sg_ses --join failed (e.g. crashed) but the pages it joins were read one by one (see topo_ses_join).
+    if (preg_match('/^ses_(sg\d+)\.json$/', $name, $mm) && ($m['timings']["sesstat_{$mm[1]}.json"]['rc'] ?? -1) === 0) continue;
+    // Optional pages: configuration (names, subenclosure revisions), element descriptors and additional element status.
+    if (preg_match('/^ses(cfg|desc|aes)_/', $name)) continue;
     if ($name === 'drives_noencl.json' && stripos($err . @file_get_contents("$dir/$name"), 'No drive found') !== false) continue;
     $m['errors'][] = "$name: " . ((int)$rc === 124 ? 'timed out' : "exit $rc") . ($err ? " - $err" : '');
   }
@@ -398,6 +403,9 @@ function topo_ses(string $dir, array &$m, array &$labels, array $k, array $names
     $short = is_file("$dir/ses_$sg.short") ? (string)file_get_contents("$dir/ses_$sg.short") : '';
     $j = topo_json("$dir/ses_$sg.json");
     $els = $j['join_of_diagnostic_pages']['element_list'] ?? null;
+    // When --join failed, collect.sh fetched its pages one by one: join them here the way sg_ses would.
+    if ($els === null && is_file("$dir/sesstat_$sg.json"))
+      $els = topo_ses_join(topo_json("$dir/sescfg_$sg.json"), topo_json("$dir/sesstat_$sg.json"), topo_json("$dir/sesdesc_$sg.json"), topo_json("$dir/sesaes_$sg.json"));
     if ($els === null && $short === '') {
       $raw = (string)@file_get_contents("$dir/ses_$sg.json") . (string)@file_get_contents("$dir/ses_$sg.json.err");
       if (preg_match('/only supports Short enclosure status[^,]*, (status=0x[0-9a-f]+)/i', $raw, $mm)) $short = $mm[1];
@@ -417,8 +425,10 @@ function topo_ses(string $dir, array &$m, array &$labels, array $k, array $names
       $hd = $headers[$th] ?? null;
       $sd = $e['status_descriptor'] ?? [];
       $status = $sd['status']['meaning'] ?? '';
+      // sg_ses writes "<null>" as the descriptor when the enclosure has no element descriptor page (7).
+      $desc = ($e['descriptor'] ?? '') === '<null>' ? '' : trim((string)($e['descriptor'] ?? ''));
       $x = ['n' => $e['element_number'], 'status' => $status, 'level' => topo_ses_level($status),
-            'desc' => trim($e['descriptor'] ?? ''), 'kv' => topo_kv($e['descriptor'] ?? ''),
+            'desc' => $desc, 'kv' => topo_kv($desc),
             'prdfail' => !empty($sd['prdfail']), 'sub' => $hd['sub'] ?? null, 'name' => ''];
       // Without element descriptors (page 7), name elements from the type descriptor text: "Power Supply B",
       // "Temp. Sensor M 2". Descriptor-based names (NetApp) keep precedence.
@@ -535,6 +545,92 @@ function topo_sub_names(array $g): array {
   $subs = [];
   foreach (['psu', 'fan', 'temp', 'volt', 'amp'] as $k) foreach ($g[$k] as $x) if ($x['sub'] !== null) $subs[$x['sub']] = true;
   return count($subs) > 1 ? $names : [];
+}
+
+/* The element list of "sg_ses --json --join", built from the separately fetched pages for enclosures where --join
+ * fails (sg_ses 2.86, sg3_utils 1.48, crashes in --json --join on enclosures without an element descriptor page, e.g.
+ * an EMC KTN-STL3: it reads the missing page's descriptor; 2.88 writes "<null>"): Configuration (1), Enclosure
+ * Status (2), Element Descriptor (7, optional) and Additional Element Status (0Ah, optional). Follows sg_ses.c
+ * (join_juggle_aes, join_aes_helper, join_array_display): one row per type descriptor header of page 1 (its overall
+ * element, then its individual elements), each with its page 2 status descriptor and page 7 descriptor in the same
+ * order ("<null>" when there is no page 7, as sg_ses 2.88 writes it). Page 0Ah descriptors are matched to rows:
+ *   EIP=0          in order, to the individual elements of the element types page 0Ah covers (SES-3);
+ *   EIP=1, EIIOE=1 element index counts all status descriptors, overall ones included;
+ *   EIP=1, EIIOE=0 element index counts individual elements only; if that lands on an element type page 0Ah does not
+ *                  cover, sg_ses switches to counting only individual elements of the covered types ("broken_ei").
+ * sg_ses's page 0Ah JSON has the element index but not EIIOE, so EIIOE=1 is assumed only when the indexes fit it and
+ * not EIIOE=0. Returns null when page 1 or 2 is missing or the two do not line up. */
+function topo_ses_join(?array $cfg, ?array $st, ?array $ed, ?array $aes): ?array {
+  $int = fn($v) => is_array($v) ? (int)($v['i'] ?? -1) : (int)$v;
+  $hdrs = $cfg['configuration_diagnostic_page']['type_descriptor_header_and_text_list'] ?? null;
+  $sts = $st['enclosure_status_diagnostic_page']['status_descriptor_list'] ?? null;
+  if (!is_array($hdrs) || !is_array($sts) || count($hdrs) !== count($sts)) return null;
+  $eds = $ed['element_descriptor_diagnostic_page']['element_descriptor_by_type_list'] ?? null;
+  if (is_array($eds) && count($eds) !== count($hdrs)) $eds = null;
+  // Element types page 0Ah reports on: device slot, ESC electronics, SCSI target/initiator port, array device slot, SAS expander.
+  $aesTypes = [1, 7, 20, 21, 23, 24];
+  $rows = []; $byTh = [];
+  foreach ($hdrs as $k => $h) {
+    $type = $int($h['element_type'] ?? -1);
+    $s = $sts[$k];
+    if ($int($s['element_type'] ?? -2) !== $type) return null;
+    $et = is_array($s['element_type']) ? $s['element_type'] : ['i' => $type, 'meaning' => ''];
+    $num = $int($h['number_of_possible_elements'] ?? 0);
+    $e7 = $eds[$k] ?? null;
+    $ind = $s['individual_status_element_list'] ?? [];
+    $desc = fn($d) => $eds === null ? '<null>' : (string)($d ?? '');
+    $rows[] = ['element_type' => $et, 'descriptor' => $desc($e7['overall_descriptor'] ?? null), 'element_number' => -1, 'overall' => 1,
+               'individual' => false, 'status_descriptor' => $s['overall_descriptor'] ?? [], '_th' => $k, '_aes' => in_array($type, $aesTypes, true)];
+    for ($j = 0; $j < $num; $j++) {
+      $byTh[$k][$j] = count($rows);
+      $rows[] = ['element_type' => $et, 'descriptor' => $desc($e7['element_descriptor'][$j]['descriptor'] ?? null), 'element_number' => $j,
+                 'overall' => 0, 'individual' => true, 'status_descriptor' => $ind[$j] ?? [], '_th' => $k, '_aes' => in_array($type, $aesTypes, true)];
+    }
+  }
+  // Index tables: all rows (EIIOE=1), individual rows (EIIOE=0), individual rows of the covered types (broken_ei).
+  $all = array_keys($rows);
+  $indiv = array_keys(array_filter($rows, fn($r) => $r['individual']));
+  $aesIndiv = array_keys(array_filter($rows, fn($r) => $r['individual'] && $r['_aes']));
+  // Page 0Ah groups its descriptors per covered type descriptor header, in page 1 order.
+  $groups = $aes['additional_element_status_diagnostic_page']['additional_element_status_by_element_type_list'] ?? [];
+  $ths = array_keys(array_filter($hdrs, fn($h) => in_array($int($h['element_type'] ?? -1), $aesTypes, true)));
+  $items = []; $gi = 0;
+  foreach ($ths as $k) {
+    $g = $groups[$gi] ?? null;
+    if (!$g || $int($g['element_type'] ?? -1) !== $int($hdrs[$k]['element_type']) || $int($g['subenclosure_identifier'] ?? 0) !== $int($hdrs[$k]['subenclosure_identifier'] ?? 0)) continue;
+    $gi++;
+    foreach ($g['additional_element_status_descriptor_list'] ?? [] as $j => $d)
+      if (is_array($x = $d['additional_element_status_descriptor'] ?? null)) $items[] = ['th' => $k, 'j' => $j, 'type' => $int($g['element_type']), 'd' => $x];
+  }
+  $fits = function (array $table) use ($items, $rows) {
+    foreach ($items as $it) {
+      if (empty($it['d']['eip'])) continue;
+      $r = $table[(int)($it['d']['element_index'] ?? -1)] ?? null;
+      if ($r === null || !$rows[$r]['individual'] || $rows[$r]['element_type']['i'] !== $it['type']) return false;
+    }
+    return true;
+  };
+  $eiioe1 = !$fits($indiv) && $fits($all);
+  $broken = false; $taken = [];
+  foreach ($items as $it) {
+    $d = $it['d'];
+    if (empty($d['eip'])) $r = $byTh[$it['th']][$it['j']] ?? null;
+    elseif ($eiioe1) $r = $all[(int)$d['element_index']] ?? null;
+    else {
+      $ei = (int)($d['element_index'] ?? -1);
+      $r = ($broken ? $aesIndiv : $indiv)[$ei] ?? null;
+      if ($r !== null && !$broken && !$rows[$r]['_aes']) { $broken = true; $r = $aesIndiv[$ei] ?? null; }
+    }
+    if ($r === null || isset($taken[$r])) continue;          // sg_ses keeps the first descriptor for an element
+    $taken[$r] = true;
+    // The join writes the descriptor without page 0Ah's own header fields. Descriptors flagged invalid (e.g. an empty
+    // bay) carry nothing else in the page's JSON; the join would decode their bytes anyway, the page does not need them.
+    $x = array_diff_key($d, array_flip(['invalid', 'eip', 'protocol_identifier', 'element_index']));
+    if ($x) $rows[$r]['additional_element_status_descriptor'] = $x;
+  }
+  foreach ($rows as &$r) unset($r['_th'], $r['_aes']);
+  unset($r);
+  return $rows;
 }
 
 // SES configuration page (sg_ses --json -p 1): subenclosures by id (vendor, product, revision) and the type

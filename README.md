@@ -44,6 +44,11 @@ Nothing is changed on the system: the plugin only runs `storcli … show … J n
 configuration pages, `lsscsi`, `lsblk`, and reads sysfs and emhttp's `disks.ini`. The only file it writes outside
 its RAM cache is `acks.json`, and only when you press Acknowledge.
 
+Enclosure data comes from `sg_ses --json --join`. Where that fails (sg_ses 2.86, from sg3_utils 1.48, crashes there
+on enclosures without an element descriptor page, such as the EMC KTN-STL3), the collector reads the pages it joins
+one at a time (configuration, enclosure status, element descriptors and additional element status; the last two are
+optional) and the page joins them the same way sg_ses does. Which way was used is noted in the diagnostics README.
+
 ## Network Topology
 
 - **Cards**: one card per physical NIC (virtual interfaces such as veth, docker, br-*, virbr, vnet, tap, wg,
@@ -88,8 +93,11 @@ The network page only runs `ethtool` queries (settings, `-i`, `-m`, `-S`, `-g`, 
   Without it the page uses the kernel's view: SAS HBA and expander PHYs and link rates from `/sys/class/sas_phy`,
   expanders and end devices from `/sys/class/sas_expander` and `/sys/class/sas_device`, and bay-to-disk mapping
   from `/sys/class/enclosure`. MegaRAID controllers hide their SAS layer from the kernel, so they need storcli.
-  storcli also works with LSI/Broadcom HBAs in IT mode (SAS3008, SAS3224, SAS3408 and later); the page then shows the
-  HBA's model, firmware and, on chips with a sensor (e.g. 9400/9500 series), its temperature. lsiutil is not used.
+  storcli also works with SAS3/SAS3.5 HBAs in IT mode (SAS3008, SAS3216/3224, SAS3408/3416 and later, e.g. 9300, 9305,
+  9400, 9500 series); the page then shows the HBA's model, firmware and, on chips with a sensor (e.g. 9400/9500
+  series), its temperature. SAS2 HBAs (SAS2008/SAS2308, e.g. 9211-8i, 9207-8i, and their OEM versions) are not
+  supported by storcli (it reports 0 controllers): the page shows them from the kernel view, and their chip
+  temperature needs other tools; the plugin does not read it. lsiutil is not used.
 
 ## How it collects
 
@@ -115,7 +123,8 @@ A full network collection takes about a second (the `mstflint` query is the slow
 - HighPoint Rocket 1528D NVMe switch card (SES temperature, fan and slot status).
 - From user reports and synthetic test fixtures (`tests/`): LSI SAS9305-24i in IT mode with SATA SSDs on the HBA
   and an LSI SAS2X28 expander backplane, 9400-16i-like wide ports and dual-expander backplanes, EMC KTN-STL3 (VNX
-  DAE, named from the SES configuration page), WD My Book USB enclosures (short status page only).
+  DAE, named from the SES configuration page; also with sg_ses 2.86, whose `--json --join` crashes on it), WD My Book USB
+  enclosures (short status page only).
 - Network: NVIDIA/Mellanox ConnectX-6 Dx dual-port 100G (mlx5) in an 802.3ad bond with 100G AOC cables and LLDP
   from the ulldpd plugin, Aquantia AQC113 10GBASE-T (atlantic), Intel AX210 Wi-Fi. SFP/SFP+ modules, other drivers'
   counter names and other bond modes are handled from the documented `ethtool`/bonding formats but have had less
@@ -143,7 +152,7 @@ https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/stor
 ## Build a release
 
 ```bash
-./build.sh 2026.10.11
+./build.sh 2026.10.12
 ```
 
 This runs the tests (`php tests/run.php`, when PHP is installed), builds `archive/storage-topology-<version>-x86_64-1.txz` and stamps the version and MD5 into
@@ -153,9 +162,11 @@ tagged with the version.
 ## Tests
 
 `tests/fixtures/` holds synthetic collector output (made by `tests/make_fixtures.py`, no real serials or addresses)
-for layouts the author's server does not have. `php tests/run.php` loads each through the page's model, checks the
-problems list, acknowledgements (against a temporary store), anonymisation, and renders the page with all PHP
-notices enabled.
+for layouts the author's server does not have, plus real data anonymised with the plugin's own anonymiser: a NetApp
+DS424's `--join` output with the pages it joins (`netapp-ds424-pages`, to check the page's own join against
+sg_ses's), and an EMC KTN-STL3 configuration page (`tests/data/`). `php tests/run.php` loads each through the page's
+model, checks the problems list, acknowledgements (against a temporary store), anonymisation, and renders the page
+with all PHP notices enabled.
 
 ## License
 

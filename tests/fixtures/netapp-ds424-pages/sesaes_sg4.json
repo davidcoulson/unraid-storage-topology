@@ -1,0 +1,812 @@
+{
+    "json_format_version": [
+        1,
+        0
+    ],
+    "utility_invoked": {
+        "name": "sg_ses",
+        "version_date": "2.88 20260526",
+        "argv": [
+            "sg_ses",
+            "--json",
+            "-p",
+            "0xa",
+            "/dev/sg4"
+        ]
+    },
+    "additional_element_status_diagnostic_page": {
+        "page_code": {
+            "i": 10,
+            "meaning": "Additional element status diagnostic page"
+        },
+        "generation_code": 5,
+        "additional_element_status_by_element_type_list": [
+            {
+                "element_type": {
+                    "i": 1,
+                    "meaning": "Device slot"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "additional_element_status_descriptor_list": [
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 0,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 0,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5764824126825323757,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 1,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 1,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5764824126825320973,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 2,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 2,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5764824126825320737,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 3,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 3,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5764824126825315533,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 4,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 4,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5766302626367386093,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 5,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 5,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5766302626367425649,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 6,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 6,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5766302626367512877,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 7,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 7,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5766302626367553473,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 8,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 8,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5764824126825647981,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 1,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 9
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 10,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 10,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5764824126825721345,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 11,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 11,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5764824126825782161,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 12,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 12,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5764824126825862465,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 13,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 13,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5764824126825329489,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 14,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 14,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5764824126825331141,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 15,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 15,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5764824126825328709,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 16,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 16,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5766302626367920581,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 17,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 17,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5766302626367977605,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 18,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 18,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5764824126826053441,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 19,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 19,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5764824126826119621,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 20,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 20,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5766302626368143101,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 21,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 21,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5766302626368206421,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 0,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 22,
+                            "descriptor_type": 0,
+                            "number_of_phy_descriptors": 1,
+                            "not_all_phys": 0,
+                            "device_slot_number": 22,
+                            "phy_descriptor_list": [
+                                {
+                                    "device_type": {
+                                        "i": 1,
+                                        "meaning": "end device"
+                                    },
+                                    "ssp_initiator_port": 0,
+                                    "stp_initiator_port": 0,
+                                    "smp_initiator_port": 0,
+                                    "sata_port_selector": 0,
+                                    "ssp_target_port": 1,
+                                    "stp_target_port": 0,
+                                    "smp_target_port": 0,
+                                    "sata_device": 0,
+                                    "attached_sas_address": 5767432718162172708,
+                                    "sas_address": 5766302626368293637,
+                                    "phy_index": 1
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "additional_element_status_descriptor": {
+                            "invalid": 1,
+                            "eip": 1,
+                            "protocol_identifier": {
+                                "i": 6,
+                                "meaning": "Serial Attached SCSI Protocol (SPL-4)"
+                            },
+                            "element_index": 23
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    "exit_status": {
+        "i": 0,
+        "meaning": "no errors"
+    }
+}

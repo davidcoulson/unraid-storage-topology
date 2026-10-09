@@ -45,6 +45,8 @@ function st_anon_scan(array &$st, string $name, string $text): void {
   // "Serial Number: X", ethtool -m "Vendor SN : X", lspci VPD "[SN] Serial number: X", ini serial="X".
   if (preg_match_all('/(?:serial number|vendor sn|\[SN\][^:\n]*)\s*:\s*(\S[^\n]*?)\s*$/im', $text, $mm)) foreach ($mm[1] as $v) st_anon_literal($st, $v);
   if (preg_match_all('/^\s*serial\s*=\s*"?([^"\n]*)"?\s*$/im', $text, $mm)) foreach ($mm[1] as $v) st_anon_literal($st, $v);
+  if (preg_match_all(ST_ANON_VSEI, $text, $mm)) foreach ($mm[2] as $hex) if (($b = st_anon_hex_bytes($hex)) !== null)
+    if (preg_match_all('/[A-Za-z0-9]{12,}/', $b, $rr)) foreach ($rr[0] as $v) if (preg_match('/\d/', $v) && preg_match('/[A-Za-z]/', $v)) st_anon_literal($st, $v);
   if ($name === 'lldp.json' && is_array($j = json_decode($text, true)) && function_exists('net_lldp'))
     foreach (net_lldp($j) as $n) if ($n['switch'] !== '') st_anon_literal($st, $n['switch'], 'switch');
 }
@@ -62,6 +64,9 @@ function st_anon_text(array &$st, string $name, string $text): string {
   $text = preg_replace('/("Inquiry Data"\s*:\s*)"[^"]*"/', '$1"(removed)"', $text);
   // lspci VPD vendor-specific fields carry serials, UUIDs and MACs in free form; the page does not use them.
   $text = preg_replace('/(\[V[0-9A-Z]\] Vendor specific:\s*)\S.*$/m', '$1(removed)', $text);
+  // SES configuration page: each subenclosure's vendor-specific bytes (hex) can spell out serial numbers (EMC KTN-STL3:
+  // LCC, chassis and PSU serials; NetApp: the shelf serial). Replaced by same-length tokens, keeping the layout.
+  $text = preg_replace_callback(ST_ANON_VSEI, function ($m) use (&$st) { return $m[1] . st_anon_hex_serials($st, $m[2]) . '"'; }, $text);
   // Literals, longest first, as whole words.
   $lits = $st['literals'];
   uksort($lits, fn($a, $b) => strlen($b) <=> strlen($a));
@@ -98,6 +103,37 @@ function st_anon_text(array &$st, string $name, string $text): string {
       ? st_anon_token($st, 'ip6', strtolower($m[1]), fn($n) => sprintf('2001:db8::%x', $n)) : $m[1]; }, $text);
   }
   return $text;
+}
+
+// sg_ses JSON of the SES configuration page: "vendor_specific_enclosure_information": "07 80 41 02 ...  43 46 32 ..."
+const ST_ANON_VSEI = '/("vendor_specific_enclosure_information"\s*:\s*")([0-9a-fA-F ]+)"/';
+
+// sg_ses hex (byte pairs separated by spaces) to bytes; null when it is not that.
+function st_anon_hex_bytes(string $hex): ?string {
+  $out = '';
+  foreach (preg_split('/ +/', trim($hex)) as $p) {
+    if (!preg_match('/^[0-9a-fA-F]{2}$/', $p)) return null;
+    $out .= chr(hexdec($p));
+  }
+  return $out;
+}
+
+// Serials (as found by st_anon_scan) spelled out in sg_ses hex become same-length tokens (SN0001 padded with zeros).
+function st_anon_hex_serials(array &$st, string $hex): string {
+  $bytes = st_anon_hex_bytes($hex);
+  if ($bytes === null) return $hex;
+  $new = $bytes;
+  foreach ($st['literals'] as $v => $tok) {
+    $len = strlen((string)$v);
+    if ($len < 6) continue;
+    for ($off = 0; ($p = stripos($new, (string)$v, $off)) !== false; $off = $p + $len)
+      $new = substr_replace($new, substr(str_pad($tok, $len, '0'), 0, $len), $p, $len);
+  }
+  if ($new === $bytes) return $hex;
+  $parts = preg_split('/( +)/', trim($hex), -1, PREG_SPLIT_DELIM_CAPTURE);
+  $fmt = preg_match('/[A-F]/', $hex) ? '%02X' : '%02x';
+  for ($i = 0, $b = 0; $i < count($parts); $i += 2, $b++) $parts[$i] = sprintf($fmt, ord($new[$b]));
+  return implode('', $parts);
 }
 
 // disks.ini / devs.ini reduced to what the page needs to name disks: name, device, type, status.

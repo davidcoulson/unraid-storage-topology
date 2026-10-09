@@ -68,6 +68,18 @@ if ($anon) {
 }
 file_put_contents("$root/versions.txt", $text);      // versions only, written after anonymising
 
+// How each enclosure's SES data was read: sg_ses --json --join, or (when that failed) its pages one at a time.
+$sesMethod = '';
+$tm = [];
+foreach (@file("$root/storage/timings", FILE_IGNORE_NEW_LINES) ?: [] as $l) { [$n, $rc] = array_pad(explode('|', $l), 2, ''); $tm[$n] = $rc; }
+foreach ($tm as $n => $rc) if (preg_match('/^ses_(sg\d+)\.json$/', $n, $mm)) {
+  $sg = $mm[1];
+  $how = is_file("$root/storage/ses_$sg.short") ? 'short enclosure status page only'
+    : (isset($tm["sesstat_$sg.json"]) ? "separate pages (--join " . ($rc === '0' ? 'gave no usable JSON' : "exit $rc") . ')' : '--join');
+  $sesMethod .= "    $sg: $how\n";
+}
+if ($sesMethod === '') $sesMethod = "    (no SES enclosures)\n";
+
 $readme = <<<TXT
 Storage Topology diagnostics
 ============================
@@ -77,6 +89,9 @@ What is in here
 - storage/: what the Storage Topology page collected (scripts/collect.sh), read-only:
     ctrl.json, phys.json, encl.json, drives.json, drives_noencl.json  storcli "show" output (when storcli is installed)
     ses_sgN.json                 sg_ses --json --join per enclosure (ses_sgN.short: short-status-only enclosures)
+    sescfg_sgN.json              sg_ses --json -p 1 (configuration page: subenclosures, element type names)
+    sesstat_sgN.json, sesdesc_sgN.json, sesaes_sgN.json
+                                 sg_ses --json -p 0x2 / 0x7 / 0xa, only when --join failed: the page joins these itself
     lsscsi.txt, lsblk.json       SCSI devices and block devices
     sas_hosts.txt, sas_phys.txt, expanders.txt, expander_phys.txt, end_devices.txt, enclosure_sysfs.txt, scsi_hosts.txt
                                  the kernel's SAS, SCSI host and enclosure view (sysfs)
@@ -85,6 +100,8 @@ What is in here
 - network/: what the Network Topology page collected (scripts/collect-net.sh): ethtool output, lspci, mstflint query,
   bonding, VLANs, bridges, hwmon, counters (base/ holds the earlier collection used for "growth"), lldpctl JSON.
 
+How the SES data of each enclosure was read:
+{$sesMethod}
 Anonymised: {$ver['anonymised']}
 When anonymised, serial numbers, WWNs, SAS addresses, MAC addresses, NVMe EUIs, PCIe serial numbers, the server's
 hostname, LLDP switch names and LLDP management addresses are replaced by tokens. The same value always gets the same

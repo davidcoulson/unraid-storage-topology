@@ -2,8 +2,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.11">
-<!ENTITY md5        "8783e2df8472d40d3f43b9e51f74abdb">
+<!ENTITY version    "2026.10.12">
+<!ENTITY md5        "309b4948f8661ba31ce4b65291a6f28a">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
@@ -24,6 +24,19 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.12
+- Storage: enclosures where "sg_ses --json --join" fails are read page by page instead (configuration, status, element
+  descriptors and additional element status) and joined the way sg_ses does, so they show instead of "no SES data".
+  sg_ses 2.86 (sg3_utils 1.48) crashes in --json --join on enclosures without an element descriptor page, such as the
+  EMC KTN-STL3. Nothing changes where --join works.
+- Storage: with sg_ses 2.88, enclosures without element descriptors (for which it writes "&lt;null&gt;") are named
+  from the configuration page as intended.
+- Both pages: Acknowledge works in the browser again. It posted multipart form data, which the webGUI never answers;
+  it now posts URL-encoded data like the rest of the webGUI, and shows a failure next to the link instead of a popup.
+- Diagnostics: the README says how each enclosure was read; serial numbers inside the SES configuration page's
+  vendor-specific bytes are anonymised too.
+- README: storcli supports SAS3/SAS3.5 HBAs only; SAS2 HBAs (SAS2008/2308, e.g. 9211-8i, 9207-8i) are shown from the
+  kernel view, without chip temperature.
 ###2026.10.11
 - Storage: drives that are in no enclosure bay (on an HBA PHY, on an expander PHY without an SES bay, or on a MegaRAID
   controller without an enclosure or in a virtual one such as EID 252) are listed under "Directly attached drives"

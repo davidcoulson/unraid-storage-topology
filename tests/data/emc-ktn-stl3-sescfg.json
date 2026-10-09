@@ -1,0 +1,351 @@
+{
+    "json_format_version": [
+        1,
+        0
+    ],
+    "utility_invoked": {
+        "name": "sg_ses",
+        "version_date": "2.86 20230623",
+        "argv": [
+            "sg_ses",
+            "--json",
+            "-p",
+            "1",
+            "/dev/sg15"
+        ]
+    },
+    "configuration_diagnostic_page": {
+        "page_code": {
+            "i": 1,
+            "meaning": "Configuration diagnostic page"
+        },
+        "number_of_secondary_subenclosures": 4,
+        "generation_code": 4,
+        "enclosure_descriptor_list": [
+            {
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "relative_enclosure_services_process_identifier": 1,
+                "number_of_enclosure_services_processes": 1,
+                "number_of_type_descriptor_headers": 10,
+                "enclosure_logical_identifier": 5766301320696927862,
+                "enclosure_vendor_identification": "EMC     ",
+                "product_identification": "Viper LCC       ",
+                "product_revision_level": "0B70",
+                "vendor_specific_enclosure_information": "07 80 41 02 00 01 01 53  4e 30 30 30 31 30 30 30  30 30 30 30 30 00 00 05  2a a6 20 31 35 35 20 53  58 50 20 32 34 78 36 47  73 65 63 00 2a 20 20 33  31 38 20 53 58 50 20 32  34 78 36 47 73 65 63 00  2a 21 20 32 32 32 20 53  58 50 20 32 34 78 36 47  73 65 63 00 2a 22 20 32  31 36 20 53 58 50 20 32  34 78 36 47 73 65 63 00  2a 23 20 30 32 31 20 43  44 45 46 00 00 00 00 00  00 00 00 00 10 02 80 00  01 03 00 02 01 04 80 02  00 05 01 2a 00 06 03 2a  00 07 85 00 00 08 86 00  00 09 02 00 00 0a 02 01  00 0b 02 02 00 0c 02 03  00 0d 02 04 00 0e 02 05  00 0f 02 06 00 10 02 07  00 11 04 00 00 02 c0 c1  05 4c 43 43 20 41"
+            },
+            {
+                "subenclosure_identifier": 1,
+                "relative_enclosure_services_process_identifier": 1,
+                "number_of_enclosure_services_processes": 1,
+                "number_of_type_descriptor_headers": 6,
+                "enclosure_logical_identifier": 5766301320697014774,
+                "enclosure_vendor_identification": "EMC     ",
+                "product_identification": "Viper LCC       ",
+                "product_revision_level": "0B70",
+                "vendor_specific_enclosure_information": "07 81 42 02 01 00 02 53  4e 30 30 30 32 30 30 30  30 30 30 30 30 00 00 05  44 06 20 31 35 35 20 53  58 50 20 32 34 78 36 47  73 65 63 00 44 00 20 33  31 38 20 53 58 50 20 32  34 78 36 47 73 65 63 00  44 01 20 32 32 32 20 53  58 50 20 32 34 78 36 47  73 65 63 00 44 02 20 32  31 36 20 53 58 50 20 32  34 78 36 47 73 65 63 00  44 03 20 30 32 31 20 43  44 45 46 00 00 00 00 00  00 00 00 00 03 12 00 03  01 13 80 03 00 14 03 44  00 01 c2 05 4c 43 43 20  42"
+            },
+            {
+                "subenclosure_identifier": 2,
+                "relative_enclosure_services_process_identifier": 1,
+                "number_of_enclosure_services_processes": 1,
+                "number_of_type_descriptor_headers": 4,
+                "enclosure_logical_identifier": 5766301320697061560,
+                "enclosure_vendor_identification": "EMC     ",
+                "product_identification": "Viper Encl      ",
+                "product_revision_level": "0011",
+                "vendor_specific_enclosure_information": "0e 1f 4d 02 02 02 00 53  4e 30 30 30 33 30 30 30  30 30 30 30 30 00 00 00  02 00 00 01 01 01 80 01  00 01 c3 07 43 68 61 73  73 69 73"
+            },
+            {
+                "subenclosure_identifier": 3,
+                "relative_enclosure_services_process_identifier": 1,
+                "number_of_enclosure_services_processes": 1,
+                "number_of_type_descriptor_headers": 3,
+                "enclosure_logical_identifier": 5766301320697061560,
+                "enclosure_vendor_identification": "EMC     ",
+                "product_identification": "000B0027\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00",
+                "product_revision_level": "2150",
+                "vendor_specific_enclosure_information": "02 80 41 02 00 04 53 4e  30 30 30 34 30 30 30 30  30 30 30 30 30 20 20 01  66 a4 20 34 2e 32 31 53  58 50 33 36 78 36 47 00  00 00 00 00 02 15 00 04  01 16 80 04 00 01 c4 0e  50 6f 77 65 72 20 53 75  70 70 6c 79 20 41"
+            },
+            {
+                "subenclosure_identifier": 4,
+                "relative_enclosure_services_process_identifier": 1,
+                "number_of_enclosure_services_processes": 1,
+                "number_of_type_descriptor_headers": 3,
+                "enclosure_logical_identifier": 5766301320697061560,
+                "enclosure_vendor_identification": "EMC     ",
+                "product_identification": "000B0027\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00",
+                "product_revision_level": "2150",
+                "vendor_specific_enclosure_information": "02 81 42 02 01 03 53 4e  30 30 30 35 30 30 30 30  30 30 30 30 30 20 20 01  6b 04 20 34 2e 32 31 53  58 50 33 36 78 36 47 00  00 00 00 00 02 17 00 05  01 18 80 05 00 01 c5 0e  50 6f 77 65 72 20 53 75  70 70 6c 79 20 42"
+            }
+        ],
+        "type_descriptor_header_and_text_list": [
+            {
+                "element_type": {
+                    "i": 23,
+                    "meaning": "Array device slot"
+                },
+                "number_of_possible_elements": 15,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 12,
+                "text": "Array Device"
+            },
+            {
+                "element_type": {
+                    "i": 4,
+                    "meaning": "Temperature sensor"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 14,
+                "text": "Temp. Sensor A"
+            },
+            {
+                "element_type": {
+                    "i": 14,
+                    "meaning": "Enclosure"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 5,
+                "text": "LCC A"
+            },
+            {
+                "element_type": {
+                    "i": 129,
+                    "meaning": "Vendor specific [0x81]"
+                },
+                "number_of_possible_elements": 25,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 12,
+                "text": "Expander Phy"
+            },
+            {
+                "element_type": {
+                    "i": 24,
+                    "meaning": "SAS expander"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 10,
+                "text": "Expander A"
+            },
+            {
+                "element_type": {
+                    "i": 7,
+                    "meaning": "Enclosure services controller electronics"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 12,
+                "text": "Controller A"
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "number_of_possible_elements": 10,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 15,
+                "text": "SAS Connector A"
+            },
+            {
+                "element_type": {
+                    "i": 12,
+                    "meaning": "Display"
+                },
+                "number_of_possible_elements": 2,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 13,
+                "text": "Display Green"
+            },
+            {
+                "element_type": {
+                    "i": 12,
+                    "meaning": "Display"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 12,
+                "text": "Display Blue"
+            },
+            {
+                "element_type": {
+                    "i": 16,
+                    "meaning": "Language"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 0,
+                "type_descriptor_text_length": 8,
+                "text": "Language"
+            },
+            {
+                "element_type": {
+                    "i": 4,
+                    "meaning": "Temperature sensor"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 1,
+                "type_descriptor_text_length": 14,
+                "text": "Temp. Sensor B"
+            },
+            {
+                "element_type": {
+                    "i": 14,
+                    "meaning": "Enclosure"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 1,
+                "type_descriptor_text_length": 5,
+                "text": "LCC B"
+            },
+            {
+                "element_type": {
+                    "i": 129,
+                    "meaning": "Vendor specific [0x81]"
+                },
+                "number_of_possible_elements": 8,
+                "subenclosure_identifier": 1,
+                "type_descriptor_text_length": 12,
+                "text": "Expander Phy"
+            },
+            {
+                "element_type": {
+                    "i": 24,
+                    "meaning": "SAS expander"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 1,
+                "type_descriptor_text_length": 10,
+                "text": "Expander B"
+            },
+            {
+                "element_type": {
+                    "i": 7,
+                    "meaning": "Enclosure services controller electronics"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 1,
+                "type_descriptor_text_length": 12,
+                "text": "Controller B"
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "number_of_possible_elements": 10,
+                "subenclosure_identifier": 1,
+                "type_descriptor_text_length": 15,
+                "text": "SAS Connector B"
+            },
+            {
+                "element_type": {
+                    "i": 14,
+                    "meaning": "Enclosure"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 2,
+                "type_descriptor_text_length": 9,
+                "text": "Enclosure"
+            },
+            {
+                "element_type": {
+                    "i": 3,
+                    "meaning": "Cooling"
+                },
+                "number_of_possible_elements": 0,
+                "subenclosure_identifier": 2,
+                "type_descriptor_text_length": 13,
+                "text": "Cooling Fan M"
+            },
+            {
+                "element_type": {
+                    "i": 4,
+                    "meaning": "Temperature sensor"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 2,
+                "type_descriptor_text_length": 14,
+                "text": "Temp. Sensor M"
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "number_of_possible_elements": 16,
+                "subenclosure_identifier": 2,
+                "type_descriptor_text_length": 15,
+                "text": "SAS Connector M"
+            },
+            {
+                "element_type": {
+                    "i": 3,
+                    "meaning": "Cooling"
+                },
+                "number_of_possible_elements": 2,
+                "subenclosure_identifier": 3,
+                "type_descriptor_text_length": 13,
+                "text": "Cooling Fan A"
+            },
+            {
+                "element_type": {
+                    "i": 4,
+                    "meaning": "Temperature sensor"
+                },
+                "number_of_possible_elements": 2,
+                "subenclosure_identifier": 3,
+                "type_descriptor_text_length": 14,
+                "text": "Temp. Sensor A"
+            },
+            {
+                "element_type": {
+                    "i": 2,
+                    "meaning": "Power supply"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 3,
+                "type_descriptor_text_length": 14,
+                "text": "Power Supply A"
+            },
+            {
+                "element_type": {
+                    "i": 3,
+                    "meaning": "Cooling"
+                },
+                "number_of_possible_elements": 2,
+                "subenclosure_identifier": 4,
+                "type_descriptor_text_length": 13,
+                "text": "Cooling Fan B"
+            },
+            {
+                "element_type": {
+                    "i": 4,
+                    "meaning": "Temperature sensor"
+                },
+                "number_of_possible_elements": 2,
+                "subenclosure_identifier": 4,
+                "type_descriptor_text_length": 14,
+                "text": "Temp. Sensor B"
+            },
+            {
+                "element_type": {
+                    "i": 2,
+                    "meaning": "Power supply"
+                },
+                "number_of_possible_elements": 1,
+                "subenclosure_identifier": 4,
+                "type_descriptor_text_length": 14,
+                "text": "Power Supply B"
+            }
+        ]
+    },
+    "exit_status": {
+        "i": 0,
+        "meaning": "no errors"
+    }
+}

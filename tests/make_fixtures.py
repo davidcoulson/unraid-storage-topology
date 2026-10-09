@@ -12,12 +12,21 @@ Layouts:
   hba-dual-expander      C0 to the primary and C1 to the secondary expander of one dual-expander backplane.
   storcli-direct         MegaRAID (storcli) with a drive in virtual enclosure 252 and one with no enclosure.
   emc-ktn-stl3           EMC KTN-STL3 (Viper DAE): 5 subenclosures, no element descriptor page, PSU B without AC.
+                         Its configuration page is real (a user's, anonymised: tests/data/emc-ktn-stl3-sescfg.json);
+                         the status and additional element status pages are made up to match it.
+  emc-ktn-stl3-pages     The same shelf where sg_ses --json --join crashes (exit 139, as sg_ses 2.86 does on
+                         enclosures without page 7): pages 1, 2 and 0Ah read one at a time, no page 7.
+
+Not written here (real data, anonymised with include/anonymise.php, kept as they are):
+  netapp-ds424-pages     NetApp DS424 IOM12: sg_ses --json --join and pages 1, 2, 7 and 0Ah from the same shelf, to
+                         check that joining the pages gives what --join gives.
 """
 import json
 import os
 import shutil
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fixtures')
+DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 DONE = '1790000000\n'
 
 
@@ -361,78 +370,114 @@ def storcli_direct():
     write(d, 'devs.ini', '')
 
 
+def emc_pages(meaning_by_header, els, gen=4):
+    """The enclosure status (2) and additional element status (0Ah) pages as sg_ses --json -p writes them, from
+    the joined element list (in page 1 order: per type descriptor header, its overall element, then the others)."""
+    st, aes, i = [], [], 0
+    for t, mn, s, c, tx in meaning_by_header:
+        ov = els[i]
+        ind = els[i + 1:i + 1 + c]
+        i += 1 + c
+        sub = {'i': 0, 'meaning': 'primary'} if s == 0 else s
+        st.append({'element_type': {'i': t, 'meaning': mn}, 'subenclosure_identifier': sub,
+                   'overall_descriptor': ov['status_descriptor'],
+                   'individual_status_element_list': [e['status_descriptor'] for e in ind]})
+        if t in (1, 7, 20, 21, 23, 24) and any('additional_element_status_descriptor' in e for e in ind):
+            lst = []
+            for n, e in enumerate(ind):
+                d = {'invalid': 0, 'eip': 1, 'protocol_identifier': {'i': 6, 'meaning': 'Serial Attached SCSI Protocol (SPL-4)'},
+                     'element_index': n}   # EIIOE=0: individual elements only (the slots are the first type here)
+                d.update(e.get('additional_element_status_descriptor', {}))
+                lst.append({'additional_element_status_descriptor': d})
+            aes.append({'element_type': {'i': t, 'meaning': mn}, 'subenclosure_identifier': sub,
+                        'additional_element_status_descriptor_list': lst})
+    page2 = {'json_format_version': [1, 0], 'enclosure_status_diagnostic_page': {
+        'invop': 0, 'info': 0, 'non_crit': 1, 'crit': 1, 'unrecov': 0, 'generation_code': gen, 'status_descriptor_list': st},
+        'exit_status': {'i': 0, 'meaning': 'no errors'}}
+    pagea = {'json_format_version': [1, 0], 'additional_element_status_diagnostic_page': {
+        'page_code': {'i': 10, 'meaning': 'Additional element status diagnostic page'}, 'generation_code': gen,
+        'additional_element_status_by_element_type_list': aes}, 'exit_status': {'i': 0, 'meaning': 'no errors'}}
+    return json.dumps(page2, indent=1) + '\n', json.dumps(pagea, indent=1) + '\n'
+
+
 def emc():
-    """EMC KTN-STL3: one SES device, 5 subenclosures, type descriptor texts but no element descriptors (page 7)."""
-    d = os.path.join(ROOT, 'emc-ktn-stl3')
-    lcc_a, lcc_b, chassis = 0x500604800a000e3e, 0x500604800a00113e, 0x5006048000000000
-    exp_a = lcc_a + 1
-    subs = [(0, 'Viper LCC', '0B70', lcc_a), (1, 'Viper LCC', '0B70', lcc_b), (2, 'Viper Encl', '0011', chassis),
-            (3, '000B0027', '2150', chassis), (4, '000B0027', '2150', chassis)]
-    headers = [  # (type, meaning, sub, count, text)
-        (23, 'Array device slot', 0, 15, 'Array Device'), (4, 'Temperature sensor', 0, 1, 'Temp. Sensor A'),
-        (14, 'Enclosure', 0, 1, 'LCC A'), (129, 'Vendor specific [0x81]', 0, 25, 'Expander Phy'),
-        (24, 'SAS expander', 0, 1, 'Expander A'), (7, 'Enclosure services controller electronics', 0, 1, 'Controller A'),
-        (25, 'SAS connector', 0, 10, 'SAS Connector A'), (12, 'Display', 0, 2, 'Display Green'), (12, 'Display', 0, 1, 'Display Blue'),
-        (17, 'Language', 0, 1, 'Language'),
-        (4, 'Temperature sensor', 1, 1, 'Temp. Sensor B'), (14, 'Enclosure', 1, 1, 'LCC B'),
-        (129, 'Vendor specific [0x81]', 1, 8, 'Expander Phy'), (24, 'SAS expander', 1, 1, 'Expander B'),
-        (7, 'Enclosure services controller electronics', 1, 1, 'Controller B'), (25, 'SAS connector', 1, 10, 'SAS Connector B'),
-        (14, 'Enclosure', 2, 1, 'Enclosure'), (3, 'Cooling', 2, 0, 'Cooling Fan M'), (4, 'Temperature sensor', 2, 1, 'Temp. Sensor M'),
-        (25, 'SAS connector', 2, 16, 'SAS Connector M'),
-        (3, 'Cooling', 3, 2, 'Cooling Fan A'), (4, 'Temperature sensor', 3, 2, 'Temp. Sensor A'), (2, 'Power supply', 3, 1, 'Power Supply A'),
-        (3, 'Cooling', 4, 2, 'Cooling Fan B'), (4, 'Temperature sensor', 4, 2, 'Temp. Sensor B'), (2, 'Power supply', 4, 1, 'Power Supply B')]
-    cfg = {'json_format_version': {'major': 1, 'minor': 0},
-           'configuration_diagnostic_page': {
-               'page_code': {'i': 1, 'meaning': 'Configuration diagnostic page'}, 'number_of_secondary_subenclosures': 4,
-               'generation_code': 4,
-               'enclosure_descriptor_list': [{'subenclosure_identifier': {'i': i, 'meaning': 'primary' if i == 0 else 'secondary'},
-                                              'relative_enclosure_services_process_identifier': 1, 'number_of_enclosure_services_processes': 1,
-                                              'number_of_type_descriptor_headers': sum(1 for h in headers if h[2] == i),
-                                              'enclosure_logical_identifier': wwn, 'enclosure_vendor_identification': 'EMC     ',
-                                              'product_identification': f'{p:<16}', 'product_revision_level': r,
-                                              'vendor_specific_enclosure_information': '00'} for i, p, r, wwn in subs],
-               'type_descriptor_header_and_text_list': [{'element_type': {'i': t, 'meaning': mn}, 'number_of_possible_elements': c,
-                                                         'subenclosure_identifier': s, 'type_descriptor_text_length': len(tx), 'text': tx}
-                                                        for t, mn, s, c, tx in headers]},
-           'exit_status': {'i': 0, 'meaning': 'no errors'}}
+    """EMC KTN-STL3: one SES device, 5 subenclosures, type descriptor texts but no element descriptors (page 7).
+    The configuration page is a user's (anonymised); element statuses are made up: PSU B has no AC input."""
+    with open(os.path.join(DATA, 'emc-ktn-stl3-sescfg.json')) as f:
+        cfg_text = f.read()
+    cfg = json.loads(cfg_text)['configuration_diagnostic_page']
+    num = lambda v: v['i'] if isinstance(v, dict) else v
+    lcc_a = num(cfg['enclosure_descriptor_list'][0]['enclosure_logical_identifier'])
+    exp_a = lcc_a + 1                      # the LCC's expander (as on the real shelf)
+    headers = [(num(h['element_type']), h['element_type']['meaning'], num(h['subenclosure_identifier']),
+                h['number_of_possible_elements'], h['text']) for h in cfg['type_descriptor_header_and_text_list']]
     els = []
+    nd = '<null>'                          # sg_ses --join's descriptor when there is no element descriptor page
     for t, mn, s, c, tx in headers:
         overall_status = 'Critical' if (t == 14 and s == 2) else ('Noncritical' if (t == 2 and s == 4) else 'OK')
         if t == 2 and s == 4:
-            els.append(psu(-1, 'Noncritical', off=1, ac_fail=1, dc_fail=1, dc_under_voltage=1))
+            els.append(psu(-1, 'Noncritical', nd, off=1, ac_fail=1, dc_fail=1, dc_under_voltage=1))
         else:
-            els.append(element(t, mn, -1, overall_status if t in (14,) else ('OK' if t != 23 else 'Unsupported')))
+            els.append(element(t, mn, -1, overall_status if t in (14,) else ('OK' if t != 23 else 'Unsupported'), nd))
         for n in range(c):
             if t == 23:
-                els.append(element(23, mn, n, 'OK', fault_sensed=0, fault_reqstd=0, ident=0,
+                els.append(element(23, mn, n, 'OK', nd, fault_sensed=0, fault_reqstd=0, ident=0,
                                    aes=slot_aes(n, 0x5000c500ca000000 + 4 * n + 1, exp_a)))
             elif t == 4:
-                els.append(temp(n, 26 + n + s))
+                e = temp(n, 26 + n + s)
+                e['descriptor'] = nd
+                els.append(e)
             elif t == 14:
                 crit = s == 2
-                els.append(encl_el(n, 'Critical' if crit else 'OK', fail_ind=1 if crit else 0))
+                els.append(encl_el(n, 'Critical' if crit else 'OK', nd, fail_ind=1 if crit else 0))
             elif t == 3:
-                els.append(fan(n, 'OK', 2500))
+                e = fan(n, 'OK', 2500)
+                e['descriptor'] = nd
+                els.append(e)
             elif t == 2:
-                els.append(psu(n, 'Critical', off=1, ac_fail=1, dc_fail=1, dc_under_voltage=1) if s == 4 else psu(n, 'OK'))
+                els.append(psu(n, 'Critical', nd, off=1, ac_fail=1, dc_fail=1, dc_under_voltage=1) if s == 4 else psu(n, 'OK', nd))
             elif t == 25:
-                els.append(element(25, mn, n, 'OK', connector_type={'i': 5, 'meaning': 'Mini SAS HD 4x receptacle (SFF-8644) [max 4 phys]'}))
+                els.append(element(25, mn, n, 'OK', nd, connector_type={'i': 5, 'meaning': 'Mini SAS HD 4x receptacle (SFF-8644) [max 4 phys]'}))
             else:
-                els.append(element(t, mn, n, 'OK'))
+                els.append(element(t, mn, n, 'OK', nd))
+    soft = 'report timestamp: transport: Host_status=0x0b [DID_SOFT_ERROR]\n'
+    page2, pagea = emc_pages(headers, els)
+
+    def base(d):
+        write(d, 'sescfg_sg3.json', cfg_text)
+        write(d, 'sescfg_sg3.json.err', soft)      # harmless, on stderr with exit 0
+        write(d, 'lsscsi.txt', lsscsi_line('1:0:15:0', 'enclosu', 'EMC', 'ESES Enclosure', '0001', '-', '/dev/sg3'))
+        write(d, 'scsi_hosts.txt', 'host1|mpt2sas\n')
+        write(d, 'sas_phys.txt', '')
+        write(d, 'lsblk.json', lsblk([]))
+        write(d, 'disks.ini', '')
+        write(d, 'devs.ini', '')
+
+    d = os.path.join(ROOT, 'emc-ktn-stl3')
     common(d, 'ses_sg3.json|0|52\nsescfg_sg3.json|0|20\n')
     write(d, 'ses_sg3.json', ses_json(els))
-    write(d, 'sescfg_sg3.json', json.dumps(cfg, indent=1) + '\n')
-    write(d, 'lsscsi.txt', lsscsi_line('1:0:15:0', 'enclosu', 'EMC', 'ESES Enclosure', '0001', '-', '/dev/sg3'))
-    write(d, 'scsi_hosts.txt', 'host1|mpt3sas\n')
-    write(d, 'sas_phys.txt', '')
-    write(d, 'lsblk.json', lsblk([]))
-    write(d, 'disks.ini', '')
-    write(d, 'devs.ini', '')
+    base(d)
+    # sg_ses --json --join crashes; the collector then reads pages 2, 7 (not supported here) and 0Ah one by one.
+    d = os.path.join(ROOT, 'emc-ktn-stl3-pages')
+    common(d, 'ses_sg3.json|139|48\nsescfg_sg3.json|0|20\nsesstat_sg3.json|0|22\nsesdesc_sg3.json|5|9\nsesaes_sg3.json|0|18\n')
+    write(d, 'sg_ses.version', 'sg_ses version: 2.86 20230623\n')
+    write(d, 'ses_sg3.json', '')
+    write(d, 'ses_sg3.json.err', soft)
+    write(d, 'sesstat_sg3.json', page2)
+    write(d, 'sesstat_sg3.json.err', soft)
+    write(d, 'sesdesc_sg3.json', '')
+    write(d, 'sesaes_sg3.json', pagea)
+    base(d)
+
+
+GENERATED = ['it-mode-sas3224', 'usb-short-ses', 'hba-wide-8', 'hba-wide-4-c1-unused', 'hba-partial-c1',
+             'hba-dual-expander', 'storcli-direct', 'emc-ktn-stl3', 'emc-ktn-stl3-pages']
 
 
 def main():
-    if os.path.isdir(ROOT):
-        shutil.rmtree(ROOT)
+    for name in GENERATED:            # only the synthetic ones: real-data fixtures stay
+        if os.path.isdir(os.path.join(ROOT, name)):
+            shutil.rmtree(os.path.join(ROOT, name))
     it_mode()
     usb()
     e12 = ('12.0 Gbit')

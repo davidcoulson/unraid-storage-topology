@@ -1,7 +1,7 @@
 #!/bin/bash
 # Storage Topology collector. Read-only: storcli "show" commands with nolog (if storcli is installed),
-# sg_ses status pages, lsscsi, lsblk, the kernel's SAS (hosts, PHYs, ports, expanders, end devices), SCSI host
-# and enclosure sysfs, and emhttp's disks.ini/devs.ini.
+# sg_ses status pages (joined, or one at a time when --join fails), lsscsi, lsblk, the kernel's SAS (hosts, PHYs,
+# ports, expanders, end devices), SCSI host and enclosure sysfs, and emhttp's disks.ini/devs.ini.
 # One run at a time (flock); a finished run replaces the cache in one rename.
 # Usage: collect.sh [max_age_seconds]   - does nothing if the cache is younger than that.
 CACHE=/var/local/storage-topology
@@ -28,7 +28,9 @@ mkdir -p "$NEW"
 run() {
   local name=$1 t=$2 s rc; shift 2
   s=$(date +%s%3N)
-  timeout -k 5 "$t" nice -n 10 "$@" >"$NEW/$name" 2>"$NEW/$name.err"; rc=$?
+  # (Braces: a command that crashes is noted in its .err file rather than by bash on the collector's stderr.)
+  { timeout -k 5 "$t" nice -n 10 "$@" >"$NEW/$name" 2>"$NEW/$name.err"; } 2>/dev/null; rc=$?
+  [ $rc -gt 128 ] && [ $rc -ne 137 ] && echo "terminated by signal $((rc - 128))" >>"$NEW/$name.err"
   echo "$name|$rc|$(( $(date +%s%3N) - s ))" >>"$NEW/timings"
   [ -s "$NEW/$name.err" ] || rm -f "$NEW/$name.err"
   return $rc
@@ -69,12 +71,24 @@ if [ -n "$STORCLI" ]; then
   fi
 fi
 
+# ses_join_ok <rc> <file>: sg_ses --json --join exited 0 and left an element list. PHP (always there on Unraid)
+# checks the JSON; without it the file must at least hold the list and end with a closing brace.
+# ("report timestamp: ... DID_SOFT_ERROR" on stderr, seen on some shelves, is harmless and not looked at.)
+ses_join_ok() {
+  [ "$1" -eq 0 ] && [ -s "$2" ] || return 1
+  if command -v php >/dev/null; then
+    php -n -r '$j = json_decode((string)file_get_contents($argv[1]), true); exit(is_array($j["join_of_diagnostic_pages"]["element_list"] ?? null) ? 0 : 1);' "$2" 2>/dev/null
+  else
+    grep -q '"element_list"' "$2" && [ "$(tr -d ' \t\r\n' <"$2" | tail -c 1)" = "}" ]
+  fi
+}
+
 lsscsi -g >"$NEW/lsscsi.txt" 2>/dev/null
 if command -v sg_ses >/dev/null; then
   sg_ses -V >"$NEW/sg_ses.version" 2>&1
   for sg in $(awk '$2=="enclosu"{print $NF}' "$NEW/lsscsi.txt"); do
     n=${sg##*/}
-    run "ses_$n.json" 20 sg_ses --json --join "$sg"
+    run "ses_$n.json" 20 sg_ses --json --join "$sg"; jrc=$?
     # Simple enclosures (USB drive boxes, SGPIO bridges, some virtual SES) only answer the one-byte
     # "Short enclosure status" page, so --join fails; keep that byte as the enclosure's status.
     grep -ho 'only supports Short enclosure status[^,]*, status=0x[0-9a-fA-F]*' "$NEW/ses_$n.json.err" "$NEW/ses_$n.json" 2>/dev/null \
@@ -84,6 +98,16 @@ if command -v sg_ses >/dev/null; then
     # Configuration page: subenclosures (vendor, product, revision) and the type descriptor texts, which name the
     # elements of enclosures that have no element descriptor page (e.g. EMC KTN-STL3: "Power Supply B").
     run "sescfg_$n.json" 20 sg_ses --json -p 1 "$sg"
+    # If --join failed or left no usable JSON, read the pages it joins one at a time; the page joins them
+    # (include/topology.php, topo_ses_join). sg_ses 2.86 (sg3_utils 1.48) crashes in --json --join on enclosures
+    # without an element descriptor page, e.g. an EMC KTN-STL3 (fixed in 2.88); its text --join and -p pages work.
+    # Enclosure status (2) is needed; element descriptors (7) and additional element status (0Ah) are optional.
+    # An sg_ses too old for --json would fail these the same way, so they are skipped then.
+    if ! ses_join_ok "$jrc" "$NEW/ses_$n.json" && ! grep -qiE 'unrecognized option|invalid option|illegal option' "$NEW/ses_$n.json.err" 2>/dev/null; then
+      run "sesstat_$n.json" 20 sg_ses --json -p 0x2 "$sg"
+      run "sesdesc_$n.json" 20 sg_ses --json -p 0x7 "$sg"
+      run "sesaes_$n.json" 20 sg_ses --json -p 0xa "$sg"
+    fi
   done
 fi
 # Each SCSI host's driver (mpt3sas, megaraid_sas, ahci, usb-storage, uas, ...), so the page can tell USB enclosures apart.

@@ -83,7 +83,9 @@ function st_problems_html(array $m, string $space): string {
 }
 
 // Script for the Acknowledge links: POST to include/ack.php with Unraid's csrf_token (checked by the webGUI's
-// local_prepend.php before ack.php runs), then reload.
+// local_prepend.php before ack.php runs), then reload. The body is URL-encoded (URLSearchParams), as jQuery's $.post
+// sends it everywhere else in the webGUI: multipart/form-data POSTs (FormData) get no response from the webGUI.
+// A failure is shown next to the link (no alert()), and the link can be tried again.
 function st_problems_js(string $csrf): string {
   $tok = json_encode($csrf, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
   return <<<JS
@@ -92,14 +94,22 @@ document.addEventListener('click', function (e) {
   var a = e.target.closest ? e.target.closest('a.st-ack') : null;
   if (!a) return;
   e.preventDefault();
-  var f = new FormData();
-  f.append('csrf_token', typeof csrf_token !== 'undefined' ? csrf_token : $tok);
-  ['space', 'id', 'fp', 'text', 'act'].forEach(function (k) { f.append(k, a.dataset[k] || ''); });
+  var body = new URLSearchParams();
+  body.append('csrf_token', typeof csrf_token !== 'undefined' ? csrf_token : $tok);
+  ['space', 'id', 'fp', 'text', 'act'].forEach(function (k) { body.append(k, a.dataset[k] || ''); });
+  if (!a.dataset.label) a.dataset.label = a.textContent;
   a.style.pointerEvents = 'none';
-  fetch('/plugins/storage-topology/include/ack.php', {method: 'POST', body: f, credentials: 'same-origin'})
+  a.classList.remove('st-warn');
+  a.textContent = 'Saving...';
+  var failed = function (why) {
+    a.style.pointerEvents = '';
+    a.classList.add('st-warn');
+    a.textContent = 'Could not save: ' + why + ' (' + a.dataset.label + ' again)';
+  };
+  fetch('/plugins/storage-topology/include/ack.php', {method: 'POST', body: body, credentials: 'same-origin'})
     .then(function (r) { return r.json().catch(function () { return {error: 'HTTP ' + r.status}; }); })
-    .then(function (j) { if (j && j.ok) location.reload(); else { a.style.pointerEvents = ''; alert('Could not save: ' + ((j && j.error) || 'unknown error')); } })
-    .catch(function (err) { a.style.pointerEvents = ''; alert('Could not save: ' + err); });
+    .then(function (j) { if (j && j.ok) location.reload(); else failed((j && j.error) || 'unknown error'); })
+    .catch(function (err) { failed(String(err)); });
 });
 </script>
 JS;

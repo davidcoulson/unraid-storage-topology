@@ -1,0 +1,337 @@
+{
+    "json_format_version": [
+        1,
+        0
+    ],
+    "utility_invoked": {
+        "name": "sg_ses",
+        "version_date": "2.88 20260526",
+        "argv": [
+            "sg_ses",
+            "--json",
+            "-p",
+            "0x7",
+            "/dev/sg4"
+        ]
+    },
+    "element_descriptor_diagnostic_page": {
+        "page_code": {
+            "i": 7,
+            "meaning": "Element descriptor diagnostic page"
+        },
+        "generation_code": 5,
+        "element_descriptor_by_type_list": [
+            {
+                "element_type": {
+                    "i": 1,
+                    "meaning": "Device slot"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {}
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 2,
+                    "meaning": "Power supply"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {
+                        "descriptor": "TP=9C;SN=SN0001;FW=0311;PN=0082562-12  ;PW=580"
+                    },
+                    {
+                        "descriptor": "TP=9C;SN=SN0002;FW=0311;PN=0082562-12  ;PW=580"
+                    },
+                    {
+                        "descriptor": "TP=9C;SN=SN0003;FW=0305;PN=0082562-11  ;PW=580"
+                    },
+                    {
+                        "descriptor": "TP=9C;SN=SN0004;FW=0305;PN=0082562-11  ;PW=580"
+                    }
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 3,
+                    "meaning": "Cooling"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {}
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 4,
+                    "meaning": "Temperature sensor"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {}
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 7,
+                    "meaning": "Enclosure services controller electronics"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {
+                        "descriptor": "TP=BA;SN=SN0005   ;FW=0281;CV=24;PN=111-02850+C1;AI=B;NA=B;IF=;    CA=2D70B990;CB=A4F03764;"
+                    },
+                    {
+                        "descriptor": "TP=BA;SN=SN0006   ;FW=0281;CV=24;PN=111-02850+C1;AI=B;NA=B;IF=;    CA=2D70B990;CB=A4F03764;"
+                    }
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 12,
+                    "meaning": "Display"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {}
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 14,
+                    "meaning": "Enclosure"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {
+                        "descriptor": "ID=01 ;MPN=0936603-02  ;MSN=SN0007;WWN=50050cc0000145c9;PN=0954292-01  ;SN=SN0008;"
+                    }
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 18,
+                    "meaning": "Voltage sensor"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {}
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 19,
+                    "meaning": "Current sensor"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    {}
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 25,
+                    "meaning": "SAS connector"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {
+                        "descriptor": "SN=SN0009   ;VN=HEWLETT-PACKARD ;CT=0f01a000;PN=691970-001+E    ;AA=500A09800002C948;UA=1;AP=00;"
+                    },
+                    {
+                        "descriptor": "SN=SN0010   ;VN=HEWLETT-PACKARD ;CT=0f01a000;PN=691970-001+E    ;AA=500A09800002C948;UA=1;AP=04;"
+                    },
+                    {
+                        "descriptor": "SN=;                VN=;                CT=;        PN=;                AA=;                UA=; AP=;  "
+                    },
+                    {
+                        "descriptor": "SN=;                VN=;                CT=;        PN=;                AA=;                UA=; AP=;  "
+                    },
+                    {
+                        "descriptor": "SN=SN0011   ;VN=HEWLETT-PACKARD ;CT=0f01a000;PN=691970-001+E    ;AA=500A098000030FA8;UA=1;AP=00;"
+                    },
+                    {
+                        "descriptor": "SN=SN0012   ;VN=HEWLETT-PACKARD ;CT=0f01a000;PN=691970-001+E    ;AA=500A098000030FA8;UA=1;AP=04;"
+                    },
+                    {
+                        "descriptor": "SN=;                VN=;                CT=;        PN=;                AA=;                UA=; AP=;  "
+                    },
+                    {
+                        "descriptor": "SN=SN0013    ;VN=THE MATE COMPANY;CT=0f01a000;PN=C5555-1M+00     ;AA=500062B000044C07;UA=1;AP=00;"
+                    }
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 131,
+                    "meaning": "Vendor specific [0x83]"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {
+                        "descriptor": "FI=00;FM=10;SA=500A098000059C78;FPI=IOM12A  ;"
+                    },
+                    {
+                        "descriptor": "FI=00;FM=10;SA=500A098000059B24;FPI=IOM12A  ;"
+                    }
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 133,
+                    "meaning": "Vendor specific [0x85]"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {
+                        "descriptor": "OM=00:A0:98:00:00:01;"
+                    },
+                    {
+                        "descriptor": "OM=00:A0:98:00:00:02;"
+                    }
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 140,
+                    "meaning": "Vendor specific [0x8c]"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {}
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 141,
+                    "meaning": "Vendor specific [0x8d]"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {},
+                    {},
+                    {},
+                    {}
+                ]
+            },
+            {
+                "element_type": {
+                    "i": 142,
+                    "meaning": "Vendor specific [0x8e]"
+                },
+                "subenclosure_identifier": {
+                    "i": 0,
+                    "meaning": "primary"
+                },
+                "element_descriptor": [
+                    {},
+                    {},
+                    {},
+                    {}
+                ]
+            }
+        ]
+    },
+    "exit_status": {
+        "i": 0,
+        "meaning": "no errors"
+    }
+}
