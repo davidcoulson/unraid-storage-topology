@@ -125,6 +125,7 @@ function topo_load(string $dir = TOPO_CACHE): array {
   topo_ses($dir, $m, $labels, $k, $names);
   topo_sysfs_drives($dir, $m, $names, $k);
   topo_shelf_drives($m);
+  topo_shelf_paths($m, $k);
   topo_direct($m, $names, $k, $labels);
   topo_links($m, $labels);
   topo_connectors($m, $k);
@@ -174,9 +175,12 @@ function topo_unraid_names(string $dir): array {
   }
   foreach ($dev2serial as $dev => $serial) $out[$serial] ??= ['name' => '', 'type' => '', 'device' => $dev, 'status' => '', 'spundown' => false,
                                                               'temp' => null, 'errors' => null];
+  // A drive the kernel sees through both of its ports (multipath cabling) has two block devices with one serial.
+  $seen = array_count_values($dev2serial);
   foreach ($out as $serial => &$o) {
     $b = $blk[$o['device']] ?? [];
     $o['model'] = trim($b['model'] ?? ''); $o['size'] = $b['size'] ?? ''; $o['serial'] = $serial; $o['tran'] = $b['tran'] ?? '';
+    $o['seen'] = $seen[$serial] ?? 1;
   }
   unset($o);
   return $out;
@@ -185,7 +189,7 @@ function topo_unraid_names(string $dir): array {
 function topo_by_dev(array $names, string $dev): array {
   foreach ($names as $n) if ($n['device'] === $dev) return $n;
   return ['name' => '', 'type' => '', 'device' => $dev, 'status' => '', 'spundown' => false, 'temp' => null, 'errors' => null,
-          'model' => '', 'size' => '', 'serial' => '', 'tran' => ''];
+          'model' => '', 'size' => '', 'serial' => '', 'tran' => '', 'seen' => 1];
 }
 
 // "disk3 (/dev/sdb, SAMSUNG MZ7LM1T9)" for port and cable labels.
@@ -439,7 +443,16 @@ function topo_ses(string $dir, array &$m, array &$labels, array $k, array $names
         case 1: case 23:
           $ae = $e['additional_element_status_descriptor'] ?? [];
           $x['slot'] = $ae['device_slot_number'] ?? $sd['slot_address'] ?? $x['n'];
-          $x['fault'] = !empty($sd['fault_sensed']) || !empty($sd['fault_reqstd']);
+          // Two fault bits: FAULT SENSED (the enclosure detected a problem) and FAULT REQSTD (host software set the
+          // RQST FAULT control bit, e.g. a RAID tool or a script that lit the LED; the shelf itself found nothing).
+          $x['fault_sensed'] = !empty($sd['fault_sensed']);
+          $x['fault_reqstd'] = !empty($sd['fault_reqstd']);
+          $x['fault'] = $x['fault_sensed'] || $x['fault_reqstd'];
+          // How to clear the requested fault bit (shown, never run): "fault" is RQST FAULT of a (array) device slot
+          // control element. --dev-slot-num needs the bay's device slot number from page 0Ah; without it, address the
+          // element by type header index and element number (sg_ses --index=TH,N, sg3_utils 1.48 and later).
+          $x['clear_cmd'] = !$x['fault_reqstd'] ? '' : 'sg_ses ' . (isset($ae['device_slot_number']) ? "--dev-slot-num={$ae['device_slot_number']}" : "--index=$th,{$x['n']}")
+            . " --clear=fault /dev/$sg";
           $x['ident'] = !empty($sd['ident']);
           $x['phys'] = array_map(fn($p) => topo_addr($p['sas_address'] ?? ''), $ae['phy_descriptor_list'] ?? []);
           $g['slot'][] = $x; break;
@@ -789,7 +802,7 @@ function topo_kernel_drive(array $n, string $blk, ?array $end, array $k): array 
     'intf' => $end ? ($end['sata'] ? 'SATA' : 'SAS') : strtoupper($n['tran'] ?? ''), 'med' => '',
     'size' => $n['size'], 'model' => $n['model'] ?: ($end['model'] ?? ''), 'vendor' => $end['vendor'] ?? '', 'serial' => $n['serial'], 'fw' => '', 'wwn' => '',
     'max_rate' => $link['max'], 'rate' => $link['rate'], 'link' => $link, 'temp' => $n['temp'], 'media_err' => null, 'other_err' => null, 'pred_fail' => null,
-    'smart_alert' => false, 'paths' => [], 'multipath' => false, 'unraid_errors' => $n['errors'],
+    'smart_alert' => false, 'paths' => [], 'multipath' => false, 'unraid_errors' => $n['errors'], 'kernel_paths' => $n['seen'] ?? 1,
     'unraid' => $n['name'], 'unraid_type' => $n['type'], 'dev' => $blk, 'spundown' => $n['spundown'],
   ];
 }
@@ -803,6 +816,28 @@ function topo_shelf_drives(array &$m): void {
       if ($mine) { $s['drives'][$d['slot']] = $d; $m['drives'][$id]['placed'] = true; }
     }
     ksort($s['drives']);
+  }
+  unset($s);
+}
+
+/* Whether the server reaches a shelf over one path or two (both I/O modules cabled to it): 'multi', 'single', or null
+ * when nothing tells. storcli: the enclosure's Port# is "Multipath", or a drive has two paths. Kernel view: the
+ * server sees two of the shelf's expanders, or a drive twice (two block devices with one serial); one expander, or
+ * drives seen once, is a single path. */
+function topo_shelf_paths(array &$m, array $k): void {
+  foreach ($m['shelves'] as $key => &$s) {
+    if ($s['eid'] !== null) {
+      $two = array_filter($s['drives'], fn($d) => $d['multipath'] || count(array_filter($d['paths'], fn($p) => $p['status'] === 'Active')) > 1);
+      $s['paths'] = $s['multipath'] || $two ? 'multi' : 'single';
+      $s['paths_why'] = $s['multipath'] ? 'storcli reports the enclosure as Multipath' : ($two ? 'drives report two paths' : 'storcli reports one path');
+      continue;
+    }
+    $exps = [];
+    foreach ($m['addr_shelf'] as $a => $sk) if ($sk === $key && isset($k['exp_by_addr'][$a])) $exps[$k['exp_by_addr'][$a]] = true;
+    $two = array_filter($s['drives'], fn($d) => ($d['kernel_paths'] ?? 1) > 1);
+    if (count($exps) > 1 || $two) { $s['paths'] = 'multi'; $s['paths_why'] = count($exps) > 1 ? 'the server sees both I/O modules\' expanders' : 'drives are seen twice'; }
+    elseif ($exps || $s['drives']) { $s['paths'] = 'single'; $s['paths_why'] = $exps ? 'the server sees one of its expanders' : 'drives are seen once'; }
+    else { $s['paths'] = null; $s['paths_why'] = ''; }
   }
   unset($s);
 }
@@ -1005,7 +1040,14 @@ function topo_problems(array &$m): void {
       if (in_array($i['level'], ['warn', 'crit'], true)) $add($i['level'], "{$s['label']} {$i['name']}: {$i['status']}", "$sk|iom|{$i['name']}", $i['status']);
     }
     // NetApp: each I/O module has its own SES device. (EMC LCCs share one, so this only applies with NetApp's IOM elements.)
-    if ($s['groups']['iomx'] && count($s['sg']) < count($s['ioms'])) $add('warn', "{$s['label']}: only " . count($s['sg']) . ' of ' . count($s['ioms']) . ' I/O modules answer SES', "$sk|ses");
+    // With one cable (one I/O module cabled to this server) the other module's SES device is not reachable: normal.
+    // It is a problem when the shelf is multipath, or when nothing tells how it is cabled.
+    $singlePath = false;
+    if ($s['groups']['iomx'] && count($s['sg']) < count($s['ioms'])) {
+      $singlePath = ($s['paths'] ?? null) === 'single';
+      if ($singlePath) $add('info', "{$s['label']}: single path: only one I/O module is cabled to this server (normal for a single-cable setup)", "$sk|ses", $s['paths_why']);
+      else $add('warn', "{$s['label']}: only " . count($s['sg']) . ' of ' . count($s['ioms']) . ' I/O modules answer SES', "$sk|ses");
+    }
     foreach (['psu' => 'PSU', 'fan' => 'Fan', 'temp' => 'Temp sensor', 'volt' => 'Voltage sensor', 'amp' => 'Current sensor', 'conn' => 'Connector', 'slot' => 'Bay'] as $k => $name)
       foreach ($s['groups'][$k] as $x) {
         $n = ($k === 'slot' ? $x['slot'] : $x['n'] + 1);
@@ -1023,10 +1065,11 @@ function topo_problems(array &$m): void {
         $val = $x['status'] . '|' . implode(',', $x['flags'] ?? []) . ($k === 'fan' ? '|' . ((int)($x['rpm'] ?? 0) === 0 ? 'stopped' : 'turning') : '');
         if (in_array($x['level'], ['warn', 'crit'], true)) $add($x['level'], "{$s['label']} $what: {$x['status']}" . (!empty($x['flags']) ? ' (' . implode(', ', $x['flags']) . ')' : '') . $rpm, $ek, $val);
         elseif (!empty($x['flags']) && !$ignoreFlags) $add('warn', "{$s['label']} $what: " . implode(', ', $x['flags']) . $rpm, $ek, $val);
-        if (!empty($x['fault'])) $add('warn', "{$s['label']} bay {$x['slot']}: fault LED", "$ek|fault", '');
+        if (!empty($x['fault_sensed'])) $add('warn', "{$s['label']} bay {$x['slot']}: the shelf reports a fault (check the drive and, for SATA drives, the interposer)", "$ek|fault-sensed", '');
+        elseif (!empty($x['fault_reqstd'])) $add('info', "{$s['label']} bay {$x['slot']}: fault LED turned on by host software (not a shelf-detected fault). Clear with: {$x['clear_cmd']}", "$ek|fault-reqstd", $x['clear_cmd']);
         if ($x['prdfail']) $add('warn', "{$s['label']} $what: predicted failure", "$ek|prdfail", '');
       }
-    if (!$s['multipath'] && $s['eid'] !== null) $add('warn', "{$s['label']}: single path to the controller", "$sk|path", '');
+    if (!$s['multipath'] && $s['eid'] !== null && !$singlePath) $add('warn', "{$s['label']}: single path to the controller", "$sk|path", '');
   }
   if (count($ioms) > 1) {
     $parts = [];

@@ -1,0 +1,36 @@
+phy-0:0:0|12.0 Gbit|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:1|12.0 Gbit|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:2|12.0 Gbit|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:3|12.0 Gbit|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:4|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:5|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:6|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:7|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:8|6.0 Gbit|12.0 Gbit|12.0 Gbit|0x500a0980000a1000|port-0:0:1|end_device-0:0:1=0x500a0980000a1100
+phy-0:0:9|6.0 Gbit|12.0 Gbit|12.0 Gbit|0x500a0980000a1000|port-0:0:2|end_device-0:0:2=0x500a0980000a1101
+phy-0:0:10|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:11|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:12|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:13|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:14|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:15|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:16|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:17|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:18|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:19|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:20|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:21|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:22|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:23|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:24|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:25|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:26|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:27|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:28|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:29|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:30|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:31|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:32|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:33|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:34|Unknown|12.0 Gbit|12.0 Gbit|0x500a0980000a1000||
+phy-0:0:35|6.0 Gbit|12.0 Gbit|12.0 Gbit|0x500a0980000a1000|port-0:0:0|end_device-0:0:0=0x500a0980000a103e

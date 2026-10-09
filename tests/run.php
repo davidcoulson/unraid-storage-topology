@@ -246,6 +246,60 @@ $m3 = load($d3);
 t(!$m3['shelves'] && matching($m3, '/Collection: ses_sg3\.json: exit 139/') && matching($m3, '/Collection: sesstat_sg3\.json: exit 5/') && matching($m3, '/sg3: no SES data/'), 'both failing is reported: ' . dump_problems($m3));
 
 // ---------------------------------------------------------------------------------------------------------
+$section = 'netapp-single-path';
+$dir = "$fx/netapp-single-path";
+$m = load($dir);
+$s = reset($m['shelves']);
+t(count($m['shelves']) === 1 && $s['label'] === 'Shelf 01' && $s['sg'] === ['sg2'] && count($s['ioms']) === 2, 'one shelf, one SES device, two I/O modules');
+t(($s['paths'] ?? null) === 'single' && count($s['drives']) === 2, 'single path (the server sees one of its expanders), two drives in bays: ' . ($s['paths_why'] ?? '-'));
+t(count(matching($m, '/^Shelf 01: single path: only one I\/O module is cabled to this server \(normal for a single-cable setup\)$/', 'info')) === 1, 'single path is a note: ' . dump_problems($m));
+t(!matching($m, '/I\/O modules answer SES|single path to the controller/'), 'no missing-I/O-module warning');
+$sensed = matching($m, '/bay 0/');
+t(count($sensed) === 1 && $sensed[0]['level'] === 'warn' && $sensed[0]['text'] === 'Shelf 01 bay 0: the shelf reports a fault (check the drive and, for SATA drives, the interposer)', 'bay 0: fault sensed is a warning');
+$reqd = matching($m, '/bay 1/');
+t(count($reqd) === 1 && $reqd[0]['level'] === 'info' && $reqd[0]['text'] === 'Shelf 01 bay 1: fault LED turned on by host software (not a shelf-detected fault). Clear with: sg_ses --dev-slot-num=1 --clear=fault /dev/sg2',
+  'bay 1: fault requested by host software is a note with the sg_ses command: ' . ($reqd[0]['text'] ?? '-'));
+t(!matching($m, '/: fault LED$/'), 'no generic "fault LED" message');
+t($m['level'] === 'warn' && count(array_filter($m['problems'], fn($p) => $p['level'] === 'warn')) === 1, 'only the sensed fault is a warning: ' . dump_problems($m));
+$slots = array_column($s['groups']['slot'], null, 'slot');
+t($slots[0]['fault_sensed'] && !$slots[0]['fault_reqstd'] && !$slots[1]['fault_sensed'] && $slots[1]['fault_reqstd'] && !$slots[2]['fault'], 'fault bits kept apart per bay');
+// Without page 0Ah's device slot number, the command addresses the element by type header and element number.
+$d2 = "$tmp/np-noaes";
+copy_dir($dir, $d2);
+$j = json_decode(file_get_contents("$d2/ses_sg2.json"), true);
+foreach ($j['join_of_diagnostic_pages']['element_list'] as &$e) if ($e['element_type']['i'] === 1 && $e['element_number'] === 1) unset($e['additional_element_status_descriptor']);
+unset($e);
+file_put_contents("$d2/ses_sg2.json", json_encode($j));
+$m2 = load($d2);
+t(count(matching($m2, '/bay 1: .* Clear with: sg_ses --index=0,1 --clear=fault \/dev\/sg2$/', 'info')) === 1, 'without a device slot number: --index=0,1: ' . dump_problems($m2));
+// Multipath shelves: the other I/O module not answering SES stays a warning.
+$d3 = "$tmp/np-two-expanders";        // the server sees IOM B's expander too
+copy_dir($dir, $d3);
+file_put_contents("$d3/expanders.txt", "expander-0:1|0x500a0980000a2000|NETAPP|DS212IOM12|0717|port-0:1\n", FILE_APPEND);
+$m3 = load($d3);
+t((reset($m3['shelves'])['paths'] ?? null) === 'multi' && count(matching($m3, '/^Shelf 01: only 1 of 2 I\/O modules answer SES$/', 'warn')) === 1 && !matching($m3, '/single path/'),
+  'both expanders visible: warning: ' . dump_problems($m3));
+$d4 = "$tmp/np-drive-twice";          // a drive seen through both ports (two block devices, one serial)
+copy_dir($dir, $d4);
+$j = json_decode(file_get_contents("$d4/lsblk.json"), true);
+$j['blockdevices'][] = ['name' => 'sdd'] + $j['blockdevices'][0];
+file_put_contents("$d4/lsblk.json", json_encode($j));
+$m4 = load($d4);
+t((reset($m4['shelves'])['paths'] ?? null) === 'multi' && count(matching($m4, '/only 1 of 2 I\/O modules answer SES/', 'warn')) === 1, 'drive seen twice: warning: ' . dump_problems($m4));
+// No kernel SAS data and no bays: nothing tells how the shelf is cabled, so it stays a warning.
+$m5 = load("$fx/netapp-ds424-pages");
+t(array_key_exists('paths', reset($m5['shelves'])) && reset($m5['shelves'])['paths'] === null && count(matching($m5, '/only 1 of 2 I\/O modules answer SES/', 'warn')) === 1, 'DS424 fixture (no kernel view): unchanged warning');
+// storcli view: the enclosure's Port# and the drives' paths.
+$sp = function (bool $mp, array $drives) {
+  $mm = ['addr_shelf' => [], 'shelves' => ['w' => ['eid' => 1, 'multipath' => $mp, 'drives' => $drives]]];
+  topo_shelf_paths($mm, ['exp_by_addr' => []]);
+  return $mm['shelves']['w']['paths'];
+};
+$drv = fn($mp, ...$st) => ['multipath' => $mp, 'paths' => array_map(fn($x) => ['status' => $x], $st)];
+t($sp(true, []) === 'multi' && $sp(false, [$drv(false, 'Active')]) === 'single' && $sp(false, [$drv(false, 'Active', 'Active')]) === 'multi'
+  && $sp(false, [$drv(true, 'Active')]) === 'multi' && $sp(false, []) === 'single', 'storcli: Multipath enclosure or a drive with two paths is multipath, else single');
+
+// ---------------------------------------------------------------------------------------------------------
 $section = 'anonymise';
 $d2 = "$tmp/anon";
 copy_dir("$fx/it-mode-sas3224", $d2);
@@ -310,6 +364,10 @@ foreach (glob("$fx/*", GLOB_ONLYDIR) as $d) {
   if ($name === 'usb-short-ses') t(str_contains($html, 'No SAS controllers found. This page is for SAS HBAs/RAID controllers and disk shelves; USB enclosures are shown below.')
     && str_contains($html, 'USB enclosure: WD My Book Duo 25F6') && str_contains($html, 'Supports only the short status page'), 'usb page text');
   if ($name === 'emc-ktn-stl3') t(str_contains($html, '(shelf fault LED on)') && str_contains($html, 'PSU B'), 'emc page shows the fault LED note');
+  if ($name === 'netapp-single-path') t(str_contains($html, '>fault sensed</span>') && str_contains($html, '>fault LED by host</span>')
+    && str_contains($html, 'Clear with: sg_ses --dev-slot-num=1 --clear=fault /dev/sg2')
+    && preg_match('/st-bay warn" title="[^"]*fault sensed[^"]*"><span class="n">0</', $html)
+    && preg_match('/st-bay info" title="[^"]*fault requested[^"]*"><span class="n">1</', $html), 'netapp-single-path page: bays show which fault bit');
   if ($name === 'it-mode-sas3224') t(str_contains($html, 'Directly attached drives') && !str_contains($html, 'SN &middot;') && !str_contains($html, 'I/O modules'), 'it-mode page: direct table, no empty serial or IOM table');
 }
 

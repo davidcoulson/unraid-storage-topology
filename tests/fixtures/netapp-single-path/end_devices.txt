@@ -1,0 +1,3 @@
+end_device-0:0:0|0x500a0980000a103e|ssp|port-0:0:0|phy-0:0:35|0:0:0:0|13|NETAPP|DS212IOM12|
+end_device-0:0:1|0x500a0980000a1100|sata|port-0:0:1|phy-0:0:8|0:0:1:0|0|ATA|ST8000VN004-2M2101|sdb
+end_device-0:0:2|0x500a0980000a1101|sata|port-0:0:2|phy-0:0:9|0:0:2:0|0|ATA|ST8000VN004-2M2101|sdc

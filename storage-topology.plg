@@ -2,8 +2,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.12a">
-<!ENTITY md5        "ddaec423c0354b341be0f302ff671001">
+<!ENTITY version    "2026.10.13">
+<!ENTITY md5        "33ee4247e26df99c1870682f891d688d">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
@@ -24,6 +24,14 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.13
+- Storage: a bay's two SES fault flags are told apart. "Fault sensed" (the shelf detected a problem) is a warning:
+  check the drive and, for SATA drives, the interposer. "Fault requested" (host software turned the fault LED on, the
+  shelf found nothing) is a note with the sg_ses command that clears it (the page never runs it). Bays show which flag
+  is set, also in their tooltip.
+- Storage: a NetApp shelf cabled with one cable ("only 1 of 2 I/O modules answer SES") is a note, "single path", when
+  the server reaches it over one path (storcli does not report it as Multipath, or the kernel sees one of its
+  expanders and each drive once). It stays a warning when the shelf is multipath or its cabling cannot be told.
 ###2026.10.12a
 - Firmware table: shelf PSUs grouped by part number, so different PSU hardware revisions on their own firmware are not shown as a mismatch.
 ###2026.10.12

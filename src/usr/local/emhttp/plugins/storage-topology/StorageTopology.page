@@ -223,23 +223,31 @@ if ($g['psu'] || $g['fan'] || $g['volt'] || $g['amp']):?>
 <div class="st-bays">
 <?foreach ($g['slot'] as $x):
   $d = $drives[$x['slot']] ?? null;
+  // Which fault bit lights the bay's fault LED: sensed by the shelf (a problem), or requested by host software (info).
+  $faultTip = !empty($x['fault_sensed']) ? "\nFault LED: the shelf reports a fault (fault sensed)"
+    : (!empty($x['fault_reqstd']) ? "\nFault LED: turned on by host software (fault requested), not a shelf-detected fault. Clear with: {$x['clear_cmd']}" : '');
+  $faultTag = !empty($x['fault_sensed']) ? "<span class='st-warn' title='The shelf reports a fault in this bay (fault sensed)'>fault sensed</span>"
+    : (!empty($x['fault_reqstd']) ? "<span class='st-info' title='Fault LED turned on by host software (fault requested), not a shelf-detected fault'>fault LED by host</span>" : '');
   if (!$d) {
     $cls = $x['level'] === 'absent' ? 'empty' : ($x['level'] === 'ok' ? 'warn' : $x['level']);
-    echo "<div class='st-bay $cls'><span class='n'>{$x['slot']}</span>" . ($x['level'] === 'absent' ? 'empty' : $h($x['status']) . '<br><span class="st-dim">no disk linked to this bay</span>') . '</div>';
+    if (!empty($x['fault_sensed']) && $cls === 'empty') $cls = 'warn';
+    echo "<div class='st-bay $cls'" . ($faultTip ? " title='{$h(ltrim($faultTip))}'" : '') . "><span class='n'>{$x['slot']}</span>"
+      . ($x['level'] === 'absent' ? 'empty' : $h($x['status']) . '<br><span class="st-dim">no disk linked to this bay</span>') . ($faultTag ? "<br>$faultTag" : '') . '</div>';
     continue;
   }
   $dl = topo_worst(array_filter([
     ($d['smart_alert'] || (int)$d['pred_fail'] > 0 || ($d['state'] !== '' && !in_array($d['state'], ['Onln', 'JBOD', 'UGood'], true))) ? 'crit' : null,
-    ((int)$d['media_err'] > 0 || $x['fault'] || in_array($x['level'], ['warn', 'crit'], true)) ? 'warn' : null,
-    ((int)$d['other_err'] > 0 || ($d['max_rate'] && $d['rate'] < $d['max_rate'])) ? 'info' : null,
+    ((int)$d['media_err'] > 0 || !empty($x['fault_sensed']) || in_array($x['level'], ['warn', 'crit'], true)) ? 'warn' : null,
+    ((int)$d['other_err'] > 0 || !empty($x['fault_reqstd']) || ($d['max_rate'] && $d['rate'] < $d['max_rate'])) ? 'info' : null,
   ]));
-  $tip = "{$d['vendor']} {$d['model']} SN {$d['serial']} FW {$d['fw']}\n{$d['size']} {$d['intf']} {$d['state']}\nSES: {$x['status']}" . ($x['ident'] ? ' (locate LED on)' : '');
+  $tip = "{$d['vendor']} {$d['model']} SN {$d['serial']} FW {$d['fw']}\n{$d['size']} {$d['intf']} {$d['state']}\nSES: {$x['status']}" . ($x['ident'] ? ' (locate LED on)' : '') . $faultTip;
 ?>
 <div class="st-bay <?=$dl?>" title="<?=$h($tip)?>"><span class="n"><?=$x['slot']?></span>
 <b><?=$diskLink($d)?></b><?=$d['dev'] && $d['unraid'] ? " <span class='st-dim'>{$h($d['dev'])}</span>" : ''?><br>
 <span class="st-dim"><?=$h($d['size'])?> <?=$h($d['model'])?></span><br>
 <?=$temp($d['temp'])?> &middot; <?=$rate($d['rate'])?><?=$d['max_rate'] && $d['rate'] < $d['max_rate'] ? "<span class='st-dim'>/{$rate($d['max_rate'])}</span>" : ''?>
 <?=(int)$d['other_err'] || (int)$d['media_err'] ? " &middot; <span class='st-warn'>err {$d['media_err']}/{$d['other_err']}</span>" : ''?>
+<?=$faultTag ? "<br>$faultTag" : ''?>
 </div>
 <?endforeach;?>
 </div>

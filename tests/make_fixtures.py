@@ -16,6 +16,10 @@ Layouts:
                          the status and additional element status pages are made up to match it.
   emc-ktn-stl3-pages     The same shelf where sg_ses --json --join crashes (exit 139, as sg_ses 2.86 does on
                          enclosures without page 7): pages 1, 2 and 0Ah read one at a time, no page 7.
+  netapp-single-path     A 12-bay NetApp-style shelf (Xyratex HB-1235 chassis; IOM descriptors and the vendor I/O module
+                         element as on the DS424 IOM12) cabled with one cable to an IT-mode HBA: one SES device for
+                         two I/O modules, the server sees only IOM A's expander. Two SATA drives: bay 0 with the
+                         fault sensed by the shelf, bay 1 with the fault LED requested by host software.
 
 Not written here (real data, anonymised with include/anonymise.php, kept as they are):
   netapp-ds424-pages     NetApp DS424 IOM12: sg_ses --json --join and pages 1, 2, 7 and 0Ah from the same shelf, to
@@ -470,8 +474,60 @@ def emc():
     base(d)
 
 
+def netapp_single_path():
+    """One SES device (IOM A's) for a shelf with two I/O modules; IOM B is not cabled to this server."""
+    d = os.path.join(ROOT, 'netapp-single-path')
+    hba = 0x500605b0feed0000
+    k = Kernel(0, 8, hba)
+    iom_a, iom_b = 0x500a0980000a1000, 0x500a0980000a2000
+    wwn = '500a0980000a0f00'
+    product = 'DS212IOM12'
+    x = k.expander([0, 1, 2, 3], iom_a, product, 36, '12.0 Gbit', '12.0 Gbit', vendor='NETAPP')
+    lss, blk, disks, bays = '', [], [], ''
+    ses_hctl = k.behind(x, 35, iom_a + 0x3e, 'ssp', 13, 'NETAPP', product, '')
+    lss += lsscsi_line(ses_hctl, 'enclosu', 'NETAPP', product, '0300', '-', '/dev/sg2')
+    model = 'ST8000VN004-2M2101'
+    els = [element(1, 'Device slot', -1, 'Unsupported')]
+    for b in range(12):
+        if b < 2:
+            dev = 'sd' + 'bc'[b]
+            sas = 0x500a0980000a1100 + b
+            hctl = k.behind(x, 8 + b, sas, 'sata', 0, 'ATA', model, dev)
+            lss += lsscsi_line(hctl, 'disk', 'ATA', 'ST8000VN004-2M21', 'SC60', f'/dev/{dev}', f'/dev/sg{3 + b}')
+            blk.append((dev, f'WSDTEST{b + 1:02d}', f'0x5000c500b000{b + 1:04x}', 'sas', model, '7.3T'))
+            disks.append((f'disk{b + 1}', {'name': f'disk{b + 1}', 'device': dev, 'type': 'Data', 'status': 'DISK_OK', 'temp': '34'}))
+            bays += f'{ses_hctl}|0x{wwn}|{b}|{b}|OK|{1 if b == 0 else 0}|0|{dev}\n'
+            # Bay 0: the shelf sensed a fault. Bay 1: host software requested the fault LED.
+            els.append(element(1, 'Device slot', b, 'OK', fault_sensed=1 if b == 0 else 0, fault_reqstd=1 if b == 1 else 0,
+                               ident=0, slot_address=b, aes=slot_aes(b, sas, iom_a)))
+        else:
+            els.append(element(1, 'Device slot', b, 'Not installed', fault_sensed=0, fault_reqstd=0, ident=0, slot_address=b,
+                               aes=slot_aes(b, 0, iom_a)))
+    els += [element(2, 'Power supply', -1, 'Unsupported'), psu(0, 'OK', 'TP=PS;SN=PSTEST0001;FW=0201;PN=114-00146;'),
+            psu(1, 'OK', 'TP=PS;SN=PSTEST0002;FW=0201;PN=114-00146;')]
+    els += [element(3, 'Cooling', -1, 'Unsupported'), fan(0), fan(1)]
+    els += [element(4, 'Temperature sensor', -1, 'Unsupported'), temp(0, 27), temp(1, 31)]
+    els += [element(7, 'Enclosure services controller electronics', -1, 'OK'),
+            element(7, 'Enclosure services controller electronics', 0, 'OK', 'TP=BA;SN=IOMTEST0001;FW=0300;PN=111-04000;'),
+            element(7, 'Enclosure services controller electronics', 1, 'OK', 'TP=BA;SN=IOMTEST0002;FW=0300;PN=111-04000;')]
+    els += [element(14, 'Enclosure', -1, 'OK'), encl_el(0, 'OK', f'ID=01;WWN={wwn};PN=111-04001;SN=SHTEST0001;')]
+    els += [element(131, 'Vendor specific [0x83]', -1, 'OK'),
+            element(131, 'Vendor specific [0x83]', 0, 'OK', f'FI=00;FM=10;SA={iom_a:016X};FPI=IOM12  ;'),
+            element(131, 'Vendor specific [0x83]', 1, 'OK', f'FI=00;FM=10;SA={iom_b:016X};FPI=IOM12  ;')]
+    common(d, 'ses_sg2.json|0|40\n')
+    write(d, 'ses_sg2.json', ses_json(els))
+    write(d, 'lsscsi.txt', lss)
+    write(d, 'enclosure_sysfs.txt', bays)
+    write(d, 'sas_hosts.txt', 'host0|mpt3sas|"SAS9300-8e"|16.00.10.00\n')
+    write(d, 'scsi_hosts.txt', 'host0|mpt3sas\n')
+    write(d, 'lsblk.json', lsblk(blk))
+    write(d, 'disks.ini', ini(disks))
+    write(d, 'devs.ini', '')
+    k.files(d)
+
+
 GENERATED = ['it-mode-sas3224', 'usb-short-ses', 'hba-wide-8', 'hba-wide-4-c1-unused', 'hba-partial-c1',
-             'hba-dual-expander', 'storcli-direct', 'emc-ktn-stl3', 'emc-ktn-stl3-pages']
+             'hba-dual-expander', 'storcli-direct', 'emc-ktn-stl3', 'emc-ktn-stl3-pages', 'netapp-single-path']
 
 
 def main():
@@ -488,6 +544,7 @@ def main():
         [(0x5003048000a1b2bf, 'SAS3x28', e12), (0x5003048000a1b2ff, 'SAS3x28', e12)])
     storcli_direct()
     emc()
+    netapp_single_path()
 
 
 if __name__ == '__main__':

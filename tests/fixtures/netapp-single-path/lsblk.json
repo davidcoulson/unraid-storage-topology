@@ -1,0 +1,20 @@
+{
+ "blockdevices": [
+  {
+   "name": "sdb",
+   "serial": "WSDTEST01",
+   "wwn": "0x5000c500b0000001",
+   "tran": "sas",
+   "model": "ST8000VN004-2M2101",
+   "size": "7.3T"
+  },
+  {
+   "name": "sdc",
+   "serial": "WSDTEST02",
+   "wwn": "0x5000c500b0000002",
+   "tran": "sas",
+   "model": "ST8000VN004-2M2101",
+   "size": "7.3T"
+  }
+ ]
+}
