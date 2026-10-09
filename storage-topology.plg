@@ -1,0 +1,57 @@
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
+<!ENTITY name       "storage-topology">
+<!ENTITY author     "davidcoulson">
+<!ENTITY version    "2026.10.09">
+<!ENTITY md5        "3cd922c2449152ced0ad03e8e705fecf">
+<!ENTITY launch     "Tools/StorageTopology">
+<!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
+<!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
+<!ENTITY supportURL "https://github.com/davidcoulson/unraid-storage-topology/issues">
+<!ENTITY package    "&name;-&version;-x86_64-1">
+<!ENTITY packageURL "&gitURL;/releases/download/&version;/&package;.txz">
+<!ENTITY plgPATH    "/boot/config/plugins/&name;">
+]>
+
+<!-- Read-only SAS storage topology page: controllers, ports, cables, disk shelves (power, cooling, sensors,
+     I/O modules, bays), firmware versions and per-drive link speed and errors, mapped to Unraid disk names. -->
+<PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;"
+        support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
+
+<CHANGES>
+###2026.10.09
+- Initial release.
+</CHANGES>
+
+<!-- Remove packages from older versions. -->
+<FILE Run="/bin/bash">
+<INLINE>
+rm -f $(ls &plgPATH;/&name;-*.txz 2>/dev/null | grep -v '&version;')
+</INLINE>
+</FILE>
+
+<FILE Name="&plgPATH;/&package;.txz" Run="upgradepkg --install-new">
+<URL>&packageURL;</URL>
+<MD5>&md5;</MD5>
+</FILE>
+
+<FILE Run="/bin/bash">
+<INLINE>
+echo ""
+echo "Storage Topology &version; installed: Tools > System Information > Storage Topology"
+command -v sg_ses >/dev/null || echo "Note: sg_ses (sg3_utils) was not found, so enclosure health will be missing."
+ls /sbin/storcli /usr/sbin/storcli /usr/local/sbin/storcli /sbin/storcli64 /usr/sbin/storcli64 /opt/MegaRAID/storcli/storcli64 >/dev/null 2>&amp;1 \
+  || echo "Note: storcli was not found. Broadcom/LSI controller and per-drive detail needs it; the kernel view is used instead."
+echo ""
+</INLINE>
+</FILE>
+
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+removepkg &package;
+rm -rf &plgPATH; /var/local/storage-topology /var/run/storage-topology.lock
+echo "Storage Topology removed."
+</INLINE>
+</FILE>
+
+</PLUGIN>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Community Applications template for the plugin. It goes in the author's CA templates repository once
+     the plugin is accepted; Support must point at the plugin's Unraid forum support thread. -->
+<Container>
+  <Name>Storage Topology</Name>
+  <Plugin>true</Plugin>
+  <PluginURL>https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg</PluginURL>
+  <PluginAuthor>davidcoulson</PluginAuthor>
+  <Category>Tools: Drivers: Status:Stable</Category>
+  <Overview>Read-only view of your SAS storage: controllers and per-lane link rates, the cable map, disk shelves (I/O modules, power supplies, fans, voltages, temperatures, bays), firmware versions with mismatches highlighted, and each drive's link speed, paths and error counts mapped to its Unraid disk name. Uses storcli when installed and sg_ses (SES), otherwise the kernel's SAS and enclosure view. Nothing is changed on the system. Tools &gt; System Information &gt; Storage Topology.</Overview>
+  <Description>Read-only SAS storage topology and enclosure health: controllers, ports, cables, shelves, bays, firmware and per-drive link/error status.</Description>
+  <Support>https://forums.unraid.net/topic/REPLACE-WITH-SUPPORT-THREAD/</Support>
+  <Project>https://github.com/davidcoulson/unraid-storage-topology</Project>
+  <Icon>https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/images/storage-topology.png</Icon>
+  <MinVer>7.0.0</MinVer>
+  <Requires>sg_ses (sg3_utils, included in Unraid 7). storcli is optional and needed for Broadcom/LSI MegaRAID detail.</Requires>
+</Container>
