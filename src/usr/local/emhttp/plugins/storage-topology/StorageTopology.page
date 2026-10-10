@@ -31,6 +31,18 @@ $diskLink = function ($d) use ($h) {
   return "<a href='/Main/Device?name=" . urlencode($d['unraid']) . "'>{$h($d['unraid'])}</a>";
 };
 $age = $m['collected'] ? time() - $m['collected'] : null;
+// "1.2 GB/s" / "85 MB/s"
+$bps = fn(float $b) => $b >= 1e9 ? number_format($b / 1e9, 2) . ' GB/s' : ($b >= 1e6 ? number_format($b / 1e6, 0) . ' MB/s' : ($b >= 1e3 ? number_format($b / 1e3, 0) . ' kB/s' : '0'));
+// Throughput chip: read/write, and the share of the link capacity when there is one.
+$ioChip = function (?array $io, string $capText) use ($bps, $chip, $m) {
+  if (!$io || !$io['drives']) return '';
+  $pct = $io['capacity'] > 0 ? $io['total'] / $io['capacity'] * 100 : null;
+  $lvl = $pct === null ? 'ok' : ($pct >= 90 ? 'warn' : ($pct >= 70 ? 'info' : 'ok'));
+  $txt = 'R ' . $bps($io['read']) . ' &middot; W ' . $bps($io['write']) . ($pct !== null ? ' &middot; ' . number_format($pct, $pct < 10 ? 1 : 0) . '%' : '');
+  $tip = "Throughput of {$io['drives']} drives over " . number_format($m['io_window'] ?? 0, 1) . ' s during the last collection'
+    . ($io['capacity'] > 0 ? ', against ' . $bps($io['capacity']) . " of $capText" : '');
+  return $chip($lvl, $txt, $tip);
+};
 ?>
 <style>
 .st-wrap{max-width:1500px}
@@ -77,6 +89,8 @@ tr.st-dim td{opacity:.55}
 <div class="st-kv">
 <?foreach (['Serial' => $c['serial'], ($c['fw_package'] !== '' ? 'Firmware package' : 'Firmware') => $c['fw_package'] !== '' ? "{$c['fw_package']} ({$c['fw']})" : $c['fw'],
              'BIOS' => $c['bios'], 'Driver' => $c['driver'], 'Mode' => $c['personality']] as $k => $v) if ((string)$v !== '') echo "<div><span>{$h($k)}</span>{$h($v)}</div>\n";?>
+<?if (!empty($c['io']['drives'])):?><div><span>Throughput</span><?=$ioChip($c['io'], 'linked lanes (' . count($c['ports']) . ' ports)')?></div>
+<?endif;?>
 <?if ($c['roc_temp'] !== null):?><div><span>Chip temperature</span><?=$temp($c['roc_temp'])?></div>
 <?endif;?>
 <?foreach (['Cache memory' => $c['memory'], 'PCI' => $c['pci'], 'SAS address' => $c['sas'], 'storcli' => explode(' ', $c['cli'])[0]] as $k => $v) if ((string)$v !== '') echo "<div><span>{$h($k)}</span>{$h($v)}</div>\n";?>
@@ -172,7 +186,8 @@ tr.st-dim td{opacity:.55}
 <h3><i class="fa fa-server"></i> <?=$h($s['label'])?> <span class="st-dim"><?=$h("{$s['vendor']} {$s['product']}")?></span> <?=$chip($sl, $lvlText[$sl])?>
 <span class="st-dim" style="font-size:.8em"><?=implode(' &middot; ', array_filter([$s['eid'] !== null ? "storcli e{$s['eid']}" : '', 'SES ' . $h(implode(', ', $s['sg'])),
   $s['serial'] !== '' ? 'SN ' . $h($s['serial']) : '', count($drives) . ' drives']))?></span>
-<?=$s['fault_explained'] ? "<span class='st-{$s['level']}' style='font-size:.85em'>(shelf fault LED on)</span>" : ''?></h3>
+<?=$s['fault_explained'] ? "<span class='st-{$s['level']}' style='font-size:.85em'>(shelf fault LED on)</span>" : ''?>
+<?=!empty($s['io']['drives']) ? "<span style='font-size:.8em'>" . $ioChip($s['io']['links'] ? $s['io'] : ['capacity' => 0] + $s['io'], $s['io']['links'] . ' direct link' . ($s['io']['links'] > 1 ? 's' : '') . ' to the controller') . '</span>' : ''?></h3>
 
 <?if ($s['ioms']):?>
 <h4>I/O modules</h4>

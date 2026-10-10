@@ -128,12 +128,14 @@ function topo_load(string $dir = TOPO_CACHE): array {
   topo_drives($dir, $m, $names);
   topo_sysfs_hba($dir, $m, $labels, $k, $names);
   topo_ses($dir, $m, $labels, $k, $names);
+  topo_vpd_devs($dir, $m, $names);
   topo_sysfs_drives($dir, $m, $names, $k);
   topo_shelf_drives($m);
   topo_shelf_paths($m, $k);
   topo_direct($m, $names, $k, $labels);
   topo_links($m, $labels);
   topo_connectors($m, $k);
+  topo_io($dir, $m);
   $m['no_sas'] = !$m['controllers'] && !$m['shelves'] && !$m['megaraid'] && $m['storcli'] === '' && !@filesize("$dir/sas_phys.txt");
   topo_problems($m);
   return $m;
@@ -879,6 +881,106 @@ function topo_shelf_paths(array &$m, array $k): void {
     else { $s['paths'] = null; $s['paths_why'] = ''; }
   }
   unset($s);
+}
+
+// /proc/diskstats snapshot (first line: time in ms) -> [ms, [device => [read bytes, written bytes]]].
+function topo_diskstats(string $file): ?array {
+  $lines = @file($file, FILE_IGNORE_NEW_LINES);
+  if (!$lines || !ctype_digit(trim($lines[0]))) return null;
+  $out = [];
+  foreach (array_slice($lines, 1) as $l) {
+    $f = preg_split('/\s+/', trim($l));
+    if (count($f) >= 10) $out[$f[2]] = [(float)$f[5] * 512, (float)$f[9] * 512];   // sectors read / written
+  }
+  return [(int)trim($lines[0]), $out];
+}
+
+// SAS link payload capacity in bytes/s: 8b/10b coding, so a 12 Gb/s lane carries 1.2 GB/s (6G: 0.6, 3G: 0.3).
+function topo_lane_bytes(float $gbps): float { return $gbps * 1e8; }
+
+/* Throughput per shelf and per controller from two diskstats snapshots taken around the collection, against the
+ * link capacity: a controller's linked lanes, and a shelf's lanes that are cabled straight to the controller (a shelf
+ * reached through another shelf shares that shelf's links, so its share is not shown as a percentage). */
+function topo_io(string $dir, array &$m): void {
+  $a = topo_diskstats("$dir/diskstats.start"); $b = topo_diskstats("$dir/diskstats.end");
+  if (!$a || !$b || $b[0] - $a[0] < 500) return;
+  $secs = ($b[0] - $a[0]) / 1000;
+  $rate = function (string $dev) use ($a, $b, $secs): ?array {
+    if ($dev === '' || !isset($a[1][$dev], $b[1][$dev])) return null;
+    return [max(0, $b[1][$dev][0] - $a[1][$dev][0]) / $secs, max(0, $b[1][$dev][1] - $a[1][$dev][1]) / $secs];
+  };
+  $sum = function (array $drives) use ($rate): array {
+    $r = 0.0; $w = 0.0; $n = 0;
+    foreach ($drives as $d) if ($x = $rate((string)($d['dev'] ?? ''))) { $r += $x[0]; $w += $x[1]; $n++; }
+    return ['read' => $r, 'write' => $w, 'total' => $r + $w, 'drives' => $n];
+  };
+  $m['io_window'] = $secs;
+  foreach ($m['shelves'] as $key => &$s) {
+    $s['io'] = $sum($s['drives']);
+    $cap = 0.0; $links = 0;
+    foreach ($m['controllers'] as $c) foreach ($c['ports'] as $p)
+      if (str_starts_with((string)($p['attached_label'] ?? ''), $s['label'] . ' ')) { $cap += array_sum(array_map('topo_lane_bytes', $p['rates'])); $links++; }
+    $s['io']['capacity'] = $cap; $s['io']['links'] = $links;
+  }
+  unset($s);
+  foreach ($m['controllers'] as $ci => &$c) {
+    $drives = [];
+    foreach ($m['shelves'] as $s) {
+      $mine = $s['ctrl'] !== null ? $s['ctrl'] === $c['id']
+        : (bool)array_filter($c['ports'], fn($p) => str_starts_with((string)($p['attached_label'] ?? ''), $s['label'] . ' '));
+      if ($mine) $drives = array_merge($drives, array_values($s['drives']));
+    }
+    foreach ($m['direct'] as $x) if (($m['drives'][$x['drive']]['ctrl'] ?? null) === $c['id'] || str_starts_with((string)$x['where'], "HBA c{$c['id']} "))
+      $drives[] = $m['drives'][$x['drive']];
+    $c['io'] = $sum($drives);
+    $c['io']['capacity'] = array_sum(array_map(fn($p) => array_sum(array_map('topo_lane_bytes', $p['rates'])), $c['ports']));
+  }
+  unset($c);
+}
+
+// vpd83.txt (dev|hex of VPD page 83h) -> [dev => [association => NAA address]]: 0 = logical unit, 1 = target port,
+// 2 = target device. Only 8-byte NAA designators are kept.
+function topo_vpd83(string $dir): array {
+  $out = [];
+  foreach (@file("$dir/vpd83.txt", FILE_IGNORE_NEW_LINES) ?: [] as $l) {
+    [$dev, $hex] = array_pad(explode('|', $l, 2), 2, '');
+    $b = ctype_xdigit($hex) && strlen($hex) % 2 === 0 ? hex2bin($hex) : '';
+    for ($i = 4; $i + 4 <= strlen($b); $i += 4 + ord($b[$i + 3])) {
+      $assoc = (ord($b[$i + 1]) >> 4) & 3;
+      if ((ord($b[$i + 1]) & 0x0f) === 3 && ord($b[$i + 3]) === 8) $out[$dev][$assoc] = strtoupper(bin2hex(substr($b, $i + 4, 8)));
+    }
+  }
+  return $out;
+}
+
+/* Bays whose storcli drive has no block device yet (per-drive detail skipped while a disk is spun down, so no serial):
+ * the SAS address the shelf reports for the bay is one of the drive's port addresses, which the kernel cached in the
+ * drive's VPD page 83h: the target port itself, or the target device address + 1 or + 2 (ports A and B). */
+function topo_vpd_devs(string $dir, array &$m, array $names): void {
+  $vpd = topo_vpd83($dir);
+  if (!$vpd) return;
+  $byAddr = [];
+  foreach ($vpd as $dev => $a) {
+    if (isset($a[1])) $byAddr[$a[1]] = $dev;
+    if (isset($a[2])) foreach ([1, 2] as $n) $byAddr[substr($a[2], 0, 8) . sprintf('%08X', (hexdec(substr($a[2], 8)) + $n) & 0xFFFFFFFF)] = $dev;
+  }
+  foreach ($m['shelves'] as $s) {
+    if ($s['eid'] === null) continue;
+    foreach ($s['groups']['slot'] as $x) {
+      $id = "{$s['ctrl']}:{$s['eid']}:{$x['slot']}";
+      if (!isset($m['drives'][$id]) || $m['drives'][$id]['dev'] !== '') continue;
+      $dev = null;
+      foreach ($x['phys'] as $p) if (isset($byAddr[$p])) $dev = $byAddr[$p];
+      if ($dev === null) continue;
+      $n = topo_by_dev($names, $dev);
+      $d = &$m['drives'][$id];
+      $d['dev'] = $dev;
+      $d['unraid'] = $n['name']; $d['unraid_type'] = $n['type']; $d['spundown'] = $n['spundown'];
+      if ($d['serial'] === '') $d['serial'] = $n['serial'];
+      if ($d['temp'] === null) $d['temp'] = $n['temp'];
+      unset($d);
+    }
+  }
 }
 
 // Drives that are in no shelf bay: storcli drives outside any enclosure the page can read (no enclosure, or a

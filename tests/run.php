@@ -362,6 +362,61 @@ t(!matching($m0, '/storcli is installed/'), 'no storcli note when storcli is abs
 rm_dir($d);
 t(topo_ses_str('000B0027\x00\x00\x00') === '000B0027' && topo_ses_str("ABC\0\0 ") === 'ABC' && topo_ses_str(' EMC     ') === 'EMC', 'NUL padding is stripped from SES strings');
 
+$section = 'vpd-bays';
+// Bays get their block device from the drive's cached VPD 83h port addresses when storcli gave no serial.
+$vpdPage = function (string $lu, string $port, string $tdev): string {
+  $des = fn(int $assoc, string $addr) => sprintf('01%02x0008', 0x03 | ($assoc << 4) | ($assoc ? 0x80 : 0)) . strtolower($addr);
+  $body = $des(0, $lu) . $des(1, $port) . $des(2, $tdev);
+  return '0083' . sprintf('%04x', strlen($body) / 2) . $body;
+};
+$d = "$tmp/vpd"; copy_dir("$fx/it-mode-3008-partial-storcli", $d);
+$m0 = load($d);
+$st = array_values(array_filter($m0['shelves'], fn($s) => $s['eid'] !== null));
+if ($st) {
+  $s0 = $st[0];
+  $bay = null; foreach ($s0['groups']['slot'] as $x) if ($x['phys'] && trim($x['phys'][0], '0') !== '' && isset($m0['drives']["{$s0['ctrl']}:{$s0['eid']}:{$x['slot']}"])) { $bay = $x; break; }
+  t($bay !== null, 'fixture has a storcli bay with an SES address');
+  // Pretend storcli's per-drive detail was skipped (no serial, so no device) and the kernel knows the drive as sdzz.
+  $addr = $bay['phys'][0];
+  $tdev = substr($addr, 0, 8) . sprintf('%08X', hexdec(substr($addr, 8)) - 1);
+  file_put_contents("$d/vpd83.txt", "sdzz|" . $vpdPage($tdev, substr($addr, 0, 8) . sprintf('%08X', hexdec(substr($addr, 8)) + 1), $tdev) . "\n");
+  $ctrl = json_decode(file_get_contents("$d/drives.json"), true);
+  array_walk_recursive($ctrl, function (&$v, $k) { if ($k === 'SN') $v = ''; });
+  file_put_contents("$d/drives.json", json_encode($ctrl));
+  $m = load($d);
+  $drv = $m['drives']["{$s0['ctrl']}:{$s0['eid']}:{$bay['slot']}"];
+  t($drv['dev'] === 'sdzz', "bay {$bay['slot']} mapped to its block device through VPD 83h (target device + 1): " . $drv['dev']);
+} else {
+  t(false, 'fixture has a storcli shelf');
+}
+rm_dir($d);
+
+$section = 'throughput';
+// Shelf and controller throughput from two /proc/diskstats snapshots, against the link capacity.
+$d = "$tmp/io"; copy_dir("$fx/netapp-single-path", $d);
+$m0 = load($d);
+$sh = reset($m0['shelves']);
+$devs = array_values(array_filter(array_map(fn($x) => $x['dev'], $sh['drives'])));
+t(count($devs) >= 2, 'fixture shelf has drives with block devices');
+$snap = function (int $ms, int $mult) use ($devs): string {
+  $out = "$ms\n";
+  // major minor name reads merged SECTORS_READ ms writes merged SECTORS_WRITTEN ...
+  foreach ($devs as $i => $dv) $out .= sprintf("   8 %d %s 100 0 %d 10 50 0 %d 5 0 20 15\n", $i * 16, $dv, 1000000 * $mult, 500000 * $mult);
+  return $out . "   8 200 notadrive 1 0 999999999 1 1 0 999999999 1 0 1 1\n";
+};
+file_put_contents("$d/diskstats.start", $snap(1000000, 1));
+file_put_contents("$d/diskstats.end", $snap(1002000, 3));      // 2 s later, +2M sectors read, +1M written per drive
+$m = load($d);
+$sh = reset($m['shelves']); $c = $m['controllers'][0];
+$n = count($devs);
+t(abs($sh['io']['read'] - $n * 2000000 * 512 / 2) < 1 && abs($sh['io']['write'] - $n * 1000000 * 512 / 2) < 1, 'shelf read/write rates from the snapshots: ' . json_encode($sh['io']));
+t($sh['io']['drives'] === $n && $sh['io']['links'] >= 1 && $sh['io']['capacity'] > 0, 'shelf capacity from its direct links');
+t(abs($c['io']['total'] - $sh['io']['total']) < 1 && $c['io']['capacity'] >= $sh['io']['capacity'], 'controller sums its shelves, capacity of all linked lanes');
+t(abs(topo_lane_bytes(12.0) - 1.2e9) < 1, '12G lane = 1.2 GB/s');
+$m1 = load("$fx/netapp-single-path");
+t(!isset(reset($m1['shelves'])['io']), 'no diskstats snapshots: no throughput');
+rm_dir($d);
+
 $section = 'network-lacp';
 // LACP: the switch side (partner state) and stale partner information count, not only this side's state.
 $bondText = function (int $actor, int $partner): string {
@@ -469,6 +524,7 @@ foreach (glob("$fx/*", GLOB_ONLYDIR) as $d) {
     && preg_match('/st-bay info" title="[^"]*fault requested[^"]*"><span class="n">1</', $html), 'netapp-single-path page: bays show which fault bit');
   if ($name === 'it-mode-3008-partial-storcli') t(str_contains($html, '>not reported</span>') && str_contains($html, 'From the kernel\'s view: storcli reported no ports for this controller.')
     && str_contains($html, 'Shelf sg12 expander (AEC-82885T)') && !str_contains($html, 'dc_over_voltage'), '3008 page: status not reported, ports from the kernel, no PSU flags');
+  if ($name === 'netapp-single-path') t(!str_contains($html, 'Throughput'), 'no throughput row without diskstats snapshots');
   if ($name === 'it-mode-sas3224') t(str_contains($html, 'Directly attached drives') && !str_contains($html, 'SN &middot;') && !str_contains($html, 'I/O modules'), 'it-mode page: direct table, no empty serial or IOM table');
 }
 

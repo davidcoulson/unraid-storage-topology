@@ -26,6 +26,9 @@ for d in "$CACHE"/new.*; do
 done
 NEW="$CACHE/new.$$"
 mkdir -p "$NEW"
+# Block device I/O counters at the start and end of the run (kernel counters: no drive is queried), for the
+# shelf and controller throughput. Each snapshot starts with its time in milliseconds.
+{ date +%s%3N; cat /proc/diskstats; } >"$NEW/diskstats.start" 2>/dev/null
 
 # run <file> <timeout> <command...>: output to $NEW/<file>, one timing line per command.
 run() {
@@ -181,9 +184,20 @@ for h in /sys/class/sas_host/host*; do
 done >"$NEW/sas_hosts.txt" 2>/dev/null
 
 lsblk -dJ -o NAME,SERIAL,WWN,TRAN,MODEL,SIZE >"$NEW/lsblk.json" 2>/dev/null
+# Each disk's device identification page (VPD 83h) as the kernel cached it at scan time (reading it sends nothing
+# to the drive): its SAS port addresses tie shelf bays to block devices even when storcli's per-drive detail is
+# skipped because a disk is spun down.
+for b in /sys/block/sd*; do
+  f=$b/device/vpd_pg83
+  [ -r "$f" ] && echo "${b##*/}|$(od -An -tx1 -v "$f" | tr -d ' \n')"
+done >"$NEW/vpd83.txt" 2>/dev/null
 cp /var/local/emhttp/disks.ini "$NEW/" 2>/dev/null
 cp /var/local/emhttp/devs.ini "$NEW/" 2>/dev/null
 
+# At least two seconds between the snapshots, so the rates mean something on a fast run.
+s0=$(head -1 "$NEW/diskstats.start" 2>/dev/null); now=$(date +%s%3N)
+[ -n "$s0" ] && [ $(( now - s0 )) -lt 2000 ] && sleep "$(awk -v d=$(( 2000 - (now - s0) )) 'BEGIN{printf "%.3f", d/1000}')"
+{ date +%s%3N; cat /proc/diskstats; } >"$NEW/diskstats.end" 2>/dev/null
 date +%s >"$NEW/done"
 rm -rf "$CACHE/old"
 [ -d "$CACHE/current" ] && mv "$CACHE/current" "$CACHE/old"

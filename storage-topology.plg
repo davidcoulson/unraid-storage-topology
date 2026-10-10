@@ -2,8 +2,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.17">
-<!ENTITY md5        "50fa2f3e946c570f62ebf25bb7d50e21">
+<!ENTITY version    "2026.10.18">
+<!ENTITY md5        "eb32a5b0072864a7b517035e413b4374">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
@@ -24,6 +24,9 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.18
+- Throughput and link utilization: each controller and shelf shows read/write rates (from the kernel's disk counters around each collection) and the share of its SAS link capacity (1.2 GB/s per 12G lane).
+- Bays are tied to their disks through each disk's cached identification page (VPD 83h port addresses), so Unraid disk names, devices and throughput show even while a disk is spun down (storcli's per-drive detail is still skipped then). Nothing is sent to the drives.
 ###2026.10.17
 - Network: an LACP bond member is also flagged when the switch side is not in sync/collecting/distributing, or when this side uses default or expired partner information.
 - Network: transceiver alarm/warning flags stay on the lane they name (a flag for a lane without a reading is no longer shown on another lane).

@@ -60,6 +60,8 @@ if ($anon) {
   $texts = [];
   foreach ($files as $f) {
     $name = basename($f);
+    // Raw VPD 83h hex holds WWNs (and on some drives the serial number) in a form the text rules cannot see: left out.
+    if ($name === 'vpd83.txt') { @unlink($f); continue; }
     if ($name === 'disks.ini' || $name === 'devs.ini') { file_put_contents($f, st_anon_ini((string)file_get_contents($f), $name === 'devs.ini')); continue; }
     $texts[$f] = (string)file_get_contents($f);
     st_anon_scan($st, $name, $texts[$f]);
@@ -96,6 +98,9 @@ What is in here
     sas_hosts.txt, sas_phys.txt, expanders.txt, expander_phys.txt, end_devices.txt, enclosure_sysfs.txt, scsi_hosts.txt
                                  the kernel's SAS, SCSI host and enclosure view (sysfs)
     disks.ini, devs.ini          Unraid's disk list
+    diskstats.start/.end         /proc/diskstats around the collection (shelf and controller throughput)
+    vpd83.txt                    each disk's cached device identification page (port addresses tie bays to disks;
+                                 left out of anonymised archives)
     timings, *.err               how long each command took, and its error output
 - network/: what the Network Topology page collected (scripts/collect-net.sh): ethtool output, lspci, mstflint query,
   bonding, VLANs, bridges, hwmon, counters (base/ holds the earlier collection used for "growth"), lldpctl JSON.
