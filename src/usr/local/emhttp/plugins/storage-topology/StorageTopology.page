@@ -247,7 +247,7 @@ if ($g['psu'] || $g['fan'] || $g['volt'] || $g['amp']):?>
 <b><?=$diskLink($d)?></b><?=$d['dev'] && $d['unraid'] ? " <span class='st-dim'>{$h($d['dev'])}</span>" : ''?><br>
 <span class="st-dim"><?=$h($d['size'])?> <?=$h($d['model'])?></span><br>
 <?=$temp($d['temp'])?> &middot; <?=$rate($d['rate'])?><?=$d['max_rate'] && $d['rate'] < $d['max_rate'] ? "<span class='st-dim'>/{$rate($d['max_rate'])}</span>" : ''?>
-<?=(int)$d['other_err'] || (int)$d['media_err'] ? " &middot; <span class='st-warn'>err {$d['media_err']}/{$d['other_err']}</span>" : ''?>
+<?=(int)$d['other_err'] || (int)$d['media_err'] ? " &middot; <span class='st-warn'>err " . (int)$d['media_err'] . '/' . (int)$d['other_err'] . '</span>' : ''?>
 <?=$faultTag ? "<br>$faultTag" : ''?>
 </div>
 <?endforeach;?>
@@ -262,8 +262,8 @@ if ($g['psu'] || $g['fan'] || $g['volt'] || $g['amp']):?>
 <td><?=$h($d['model'])?></td><td><?=$h($d['serial'])?></td><td><?=$h($d['fw'])?></td><td class="num"><?=$h($d['size'])?></td><td class="num"><?=$temp($d['temp'])?></td>
 <td><?=$chip($d['max_rate'] && $d['rate'] < $d['max_rate'] ? 'info' : 'ok', $rate($d['rate']) . ($d['max_rate'] ? ' of ' . $rate($d['max_rate']) : ''))?></td>
 <td><?foreach ($d['paths'] as $p) echo $chip($p['status'] === 'Active' ? 'ok' : 'warn', "P{$p['port']} {$rate($p['rate'])}", $p['sas']) . ' ';?></td>
-<td class="num <?=(int)$d['media_err'] ? 'st-warn' : ''?>"><?=$d['media_err'] ?? '-'?></td><td class="num <?=(int)$d['other_err'] ? 'st-info' : ''?>"><?=$d['other_err'] ?? '-'?></td>
-<td class="num <?=(int)$d['pred_fail'] ? 'st-crit' : ''?>"><?=$d['pred_fail'] ?? '-'?></td><td><?=$d['smart_alert'] ? $chip('crit', 'alert') : $chip('ok', 'ok')?></td></tr>
+<td class="num <?=(int)$d['media_err'] ? 'st-warn' : ''?>"><?=$d['media_err'] === null ? '-' : (int)$d['media_err']?></td><td class="num <?=(int)$d['other_err'] ? 'st-info' : ''?>"><?=$d['other_err'] === null ? '-' : (int)$d['other_err']?></td>
+<td class="num <?=(int)$d['pred_fail'] ? 'st-crit' : ''?>"><?=$d['pred_fail'] === null ? '-' : (int)$d['pred_fail']?></td><td><?=$d['smart_alert'] ? $chip('crit', 'alert') : $chip('ok', 'ok')?></td></tr>
 <?endforeach;?>
 </table>
 </details>

@@ -30,12 +30,12 @@ function topo_trim_keys(array $a): array {
   return $out;
 }
 
-// "TP=9C;SN=ABC123;FW=0311;" -> [TP=>9C, SN=>ABC123, FW=>0311]. Empty values are dropped.
 // A fixed-width SES/SCSI identification string: some enclosures pad with NUL bytes, which sg_ses's JSON writes as "\x00".
 function topo_ses_str(string $s): string {
   return trim(str_replace(['\\x00', "\0"], '', $s));
 }
 
+// "TP=9C;SN=ABC123;FW=0311;" -> [TP=>9C, SN=>ABC123, FW=>0311]. Empty values are dropped.
 function topo_kv(string $s): array {
   $out = [];
   foreach (explode(';', $s) as $part) {
@@ -310,7 +310,7 @@ function topo_controllers(string $dir, array &$m, array &$labels): void {
     ksort($ports); ksort($phyList);
     // The HBA's SAS address is its base; port n is reported on cables as base + n.
     if ($sas !== '') foreach ($ports as $pn => $_) {
-      $addr = strtoupper(str_pad(dechex(hexdec(substr($sas, -4)) + $pn), 4, '0', STR_PAD_LEFT));
+      $addr = sprintf('%04X', (hexdec(substr($sas, -4)) + $pn) & 0xFFFF);
       $labels[substr($sas, 0, -4) . $addr] = "HBA c$id port $pn";
     }
     // Some OEM and IT-mode firmware (e.g. Inspur's SAS3008 IT) gives storcli no controller status and no PHY data:
@@ -777,7 +777,7 @@ function topo_sysfs_hba(string $dir, array &$m, array &$labels, array $k, array 
     if (!$ports) continue;
     foreach ($ports as $pt) foreach ($pt['phys'] as $n) $m['hphy_port']["phy-$h:$n"] = "HBA c$h port {$pt['port']}";
     $m['controllers'][] = [
-      'id' => (int)$h, 'model' => $hi['board'] ?: ($hi['driver'] ?: 'SAS HBA') . " (host$h)", 'serial' => '', 'sas' => $sas, 'pci' => '',
+      'id' => (int)$h, 'model' => $hi['board'] ?: ($hi['driver'] ?: 'SAS HBA') . " (host$h)", 'serial' => '', 'sas' => $sas, 'pci' => $hi['pci'] ?? '',
       'fw_package' => '', 'fw' => $hi['fw'] ?? '', 'bios' => '', 'driver' => $hi['driver'] ?? '', 'status' => 'Optimal',
       'personality' => 'HBA (kernel view, ' . (!empty($m['storcli_ran']) ? 'not supported by storcli)' : 'storcli not installed)'), 'roc_temp' => null, 'memory' => '', 'pending_fw' => null, 'cli' => '',
       'ports' => array_values($ports), 'phy_list' => $phyList, 'unused_phys' => count(array_filter($phyList, fn($x) => $x['port'] === null)),

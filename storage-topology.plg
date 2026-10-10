@@ -2,8 +2,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.15">
-<!ENTITY md5        "a453e2e681b9b2264c71072ffa86da0a">
+<!ENTITY version    "2026.10.16">
+<!ENTITY md5        "b33f33e5343fbd41b4cc8adce072e1f9">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
@@ -24,6 +24,12 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.16
+- Per-drive storcli detail is also skipped while an unassigned device (devs.ini) is spun down, so the page never wakes one.
+- HBA port labels wrap within the SAS address's last 16 bits (no 5-digit address tail near FFFF).
+- Acknowledge/Unacknowledge reloads without ?refresh=1, so it no longer forces a new storcli/sg_ses collection.
+- Drive error counters are always shown as numbers. Kernel-only HBAs show their PCI address.
+- Network collector notes a crashed command in its error file, like the storage collector.
 ###2026.10.15
 - SAS2 HBAs (9207/9211/9217...) with storcli installed: no more "Collection: controller 0: No Controller found" warning; storcli does not support SAS2 cards, so a note says so and the card's mode reads "kernel view, not supported by storcli".
 - Shelf PSU/subenclosure part numbers no longer show NUL padding (e.g. EMC "000B0027\x00\x00...").

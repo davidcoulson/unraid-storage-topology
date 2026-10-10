@@ -57,8 +57,9 @@ if [ -n "$STORCLI" ]; then
   storcli ctrl.json /call show all
   storcli phys.json /call/pall show
   storcli encl.json /call/eall show all
-  # Per-drive detail talks to the drives. Skip it while any disk is spun down so this page never wakes one.
-  SPUN=$(grep -c '^spundown="1"' /var/local/emhttp/disks.ini 2>/dev/null)
+  # Per-drive detail talks to the drives. Skip it while any disk is spun down so this page never wakes one:
+  # array and pool disks (disks.ini) and unassigned devices (devs.ini) alike.
+  SPUN=$(cat /var/local/emhttp/disks.ini /var/local/emhttp/devs.ini 2>/dev/null | grep -c '^spundown="1"')
   # Drives not in any enclosure (e.g. direct-attached on tri-mode controllers) are only listed by /cx/sall.
   # Controllers without such drives answer "No drive found!", which the page ignores.
   if [ "${SPUN:-0}" -eq 0 ]; then

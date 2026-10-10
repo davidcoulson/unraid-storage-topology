@@ -108,7 +108,11 @@ document.addEventListener('click', function (e) {
   };
   fetch('/plugins/storage-topology/include/ack.php', {method: 'POST', body: body, credentials: 'same-origin'})
     .then(function (r) { return r.json().catch(function () { return {error: 'HTTP ' + r.status}; }); })
-    .then(function (j) { if (j && j.ok) location.reload(); else failed((j && j.error) || 'unknown error'); })
+    .then(function (j) {
+      if (!(j && j.ok)) return failed((j && j.error) || 'unknown error');
+      // Reload without ?refresh=1: an acknowledgement needs no new collection (storcli/sg_ses), the 60 s cache will do.
+      var u = new URL(location.href); u.searchParams.delete('refresh'); location.replace(u.toString());
+    })
     .catch(function (err) { failed(String(err)); });
 });
 </script>
