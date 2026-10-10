@@ -106,7 +106,8 @@ Anonymised: {$ver['anonymised']}
 When anonymised, serial numbers, WWNs, SAS addresses, MAC addresses, NVMe EUIs, PCIe serial numbers, the server's
 hostname, LLDP switch names and LLDP management addresses are replaced by tokens. The same value always gets the same
 token, so the topology stays readable (SAS addresses keep their vendor prefix and last byte). disks.ini and devs.ini
-are reduced to each disk's name, device, type and status.
+are reduced to each disk's name, device, type and status. Interface names (eth0, bond0, br0, ...), PCI addresses
+and disk device names (sdb, nvme0n1) are kept: the topology cannot be read without them.
 
 Nothing here was changed on the server; all commands are read-only queries.
 TXT;

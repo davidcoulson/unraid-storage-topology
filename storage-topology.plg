@@ -2,8 +2,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.16">
-<!ENTITY md5        "b33f33e5343fbd41b4cc8adce072e1f9">
+<!ENTITY version    "2026.10.17">
+<!ENTITY md5        "50fa2f3e946c570f62ebf25bb7d50e21">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
@@ -24,6 +24,12 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.17
+- Network: an LACP bond member is also flagged when the switch side is not in sync/collecting/distributing, or when this side uses default or expired partner information.
+- Network: transceiver alarm/warning flags stay on the lane they name (a flag for a lane without a reading is no longer shown on another lane).
+- Network: a collection that cannot read any interface keeps the last good data (the page says the collector failed); a failed ethtool query on a port is reported.
+- Network: per-queue/per-priority driver counters of more drivers are left out of the totals.
+- Both collectors only remove their own stale staging folders. Diagnostics README says interface names, PCI and disk device names are kept when anonymising.
 ###2026.10.16
 - Per-drive storcli detail is also skipped while an unassigned device (devs.ini) is spun down, so the page never wakes one.
 - HBA port labels wrap within the SAS address's last 16 bits (no 5-digit address tail near FFFF).

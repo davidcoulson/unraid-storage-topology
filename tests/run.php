@@ -362,6 +362,42 @@ t(!matching($m0, '/storcli is installed/'), 'no storcli note when storcli is abs
 rm_dir($d);
 t(topo_ses_str('000B0027\x00\x00\x00') === '000B0027' && topo_ses_str("ABC\0\0 ") === 'ABC' && topo_ses_str(' EMC     ') === 'EMC', 'NUL padding is stripped from SES strings');
 
+$section = 'network-lacp';
+// LACP: the switch side (partner state) and stale partner information count, not only this side's state.
+$bondText = function (int $actor, int $partner): string {
+  return "Bonding Mode: IEEE 802.3ad Dynamic link aggregation\nTransmit Hash Policy: layer3+4 (1)\nMII Status: up\n"
+    . "802.3ad info\nLACP rate: fast\nActive Aggregator Info:\n\tAggregator ID: 1\n\tNumber of ports: 2\n\tPartner Mac Address: 02:00:00:00:00:01\n"
+    . "\nSlave Interface: eth0\nMII Status: up\nSpeed: 100000 Mbps\nDuplex: full\nLink Failure Count: 0\nAggregator ID: 1\n"
+    . "details actor lacp pdu:\n    port state: $actor\ndetails partner lacp pdu:\n    system mac address: 02:00:00:00:00:01\n    port state: $partner\n"
+    . "\nSlave Interface: eth1\nMII Status: up\nSpeed: 100000 Mbps\nDuplex: full\nLink Failure Count: 0\nAggregator ID: 1\n"
+    . "details actor lacp pdu:\n    port state: 63\ndetails partner lacp pdu:\n    system mac address: 02:00:00:00:00:01\n    port state: 63\n";
+};
+$lacp = function (int $actor, int $partner) use ($bondText): array {
+  $m = ['errors' => [], 'notes' => [], 'cards' => [], 'ports' => [], 'bonds' => ['bond0' => net_bond($bondText($actor, $partner))],
+        'window' => null, 'problems' => [], 'level' => 'ok'];
+  net_problems($m);
+  return array_values(array_filter(array_column($m['problems'], 'text'), fn($t) => str_starts_with($t, 'bond0:')));
+};
+t($lacp(63, 63) === [], 'healthy LACP on both sides: no bond problem: ' . implode(' | ', $lacp(63, 63)));
+t((bool)preg_grep('/switch side of eth0 is not distributing/', $lacp(63, 15)), 'partner not collecting/distributing is a warning');
+t((bool)preg_grep('/eth0 uses default partner information/', $lacp(63 | 64, 63)), 'actor using defaulted partner info is a warning');
+t((bool)preg_grep('/eth0 stopped receiving LACPDUs/', $lacp(63 | 128, 63)), 'expired partner info is a warning');
+t((bool)preg_grep('/eth0 is not distributing \(LACP state/', $lacp(15, 63)), 'this side not distributing is still reported');
+
+$section = 'network-module-flags';
+// A lane-numbered flag stays on its lane; only a lane-less flag on a single-lane metric maps to that lane.
+$mod = ['temp' => null, 'volt' => null, 'thr' => [], 'lanes' => [1 => ['rx' => ['mw' => 0.5, 'dbm' => -3.0]], 2 => ['rx' => ['mw' => 0.6, 'dbm' => -2.2]]],
+        'flags' => [['what' => 'rx', 'lane' => 4, 'dir' => 'low', 'level' => 'crit']]];
+$r = net_module_readings($mod);
+t(isset($r['rx'][4]) && $r['rx'][4]['v'] === null && $r['rx'][4]['level'] === 'crit' && !isset($r['rx'][1]['flag']) && !isset($r['rx'][2]['flag']),
+  'a flag for lane 4 without a reading stays on lane 4');
+$mod['flags'] = [['what' => 'rx', 'lane' => 2, 'dir' => 'low', 'level' => 'warn']];
+$r = net_module_readings($mod);
+t(($r['rx'][2]['flag'] ?? '') === 'low warning' && !isset($r['rx'][1]['flag']), 'a flag for lane 2 marks lane 2');
+$single = ['temp' => null, 'volt' => null, 'thr' => [], 'lanes' => [1 => ['bias' => 6.5]], 'flags' => [['what' => 'bias', 'lane' => 0, 'dir' => 'high', 'level' => 'warn']]];
+$r = net_module_readings($single);
+t(($r['bias'][1]['flag'] ?? '') === 'high warning' && !isset($r['bias'][0]), 'a lane-less flag on a single-lane metric marks that lane');
+
 $section = 'anonymise';
 $d2 = "$tmp/anon";
 copy_dir("$fx/it-mode-sas3224", $d2);

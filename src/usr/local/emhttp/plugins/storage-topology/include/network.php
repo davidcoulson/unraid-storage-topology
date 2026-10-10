@@ -163,7 +163,9 @@ function net_module_readings(array $mod): array {
   // The module's own alarm/warning flags count too (some modules flag without the host-visible value crossing).
   foreach ($mod['flags'] as $f) {
     $lane = $f['lane'];
-    if (!isset($r[$f['what']][$lane])) $lane = array_key_first($r[$f['what']] ?? [0 => 0]);
+    // A flag without a lane (0) belongs to the one reading of a single-lane metric; otherwise it keeps its own lane,
+    // shown without a value when that lane has no reading, so it is never reported against another lane.
+    if ($lane === 0 && !isset($r[$f['what']][0]) && count($r[$f['what']] ?? []) === 1) $lane = array_key_first($r[$f['what']]);
     $r[$f['what']][$lane] ??= ['v' => null, 'level' => 'ok'];
     $r[$f['what']][$lane]['level'] = net_worst([$r[$f['what']][$lane]['level'], $f['level']]);
     $r[$f['what']][$lane]['flag'] = "{$f['dir']} " . ($f['level'] === 'crit' ? 'alarm' : 'warning');
@@ -296,7 +298,8 @@ function net_load(string $dir = NET_CACHE): array {
     if ((int)$rc === 0) continue;
     $err = trim((string)@file_get_contents("$dir/$name.err"));
     if ((int)$rc === 124 || (int)$rc === 137) $m['errors'][] = "$name: timed out";
-    elseif (preg_match('/^(lspci|drvinfo)_/', $name)) $m['errors'][] = "$name: exit $rc" . ($err ? " - $err" : '');
+    elseif (preg_match('/^(lspci|drvinfo|ethtool)_/', $name)) $m['errors'][] = "$name: exit $rc" . ($err ? " - $err" : '');
+    elseif (str_starts_with($name, 'stats_')) $m['notes'][] = "$name: exit $rc (no driver counters for this port)" . ($err ? " - $err" : '');
     elseif (preg_match('/^(mstflint_|lldp)/', $name)) $m['notes'][] = "$name: exit $rc" . ($err ? " - $err" : '');
     // fec_/module_/ring_/stats_ fail with "Operation not supported" on ports without that feature: not a problem.
   }
@@ -643,6 +646,12 @@ function net_problems(array &$m): void {
           $add('warn', "$bn: $sn is in aggregator {$s['agg']}, not the active aggregator {$b['agg']}, so it carries no traffic (the switch puts it in a different LAG or none)", $bn, "bond|$bn|$sn|agg", "{$s['agg']}|{$b['agg']}");
         elseif ($s['actor_state'] !== null && ($s['actor_state'] & 0x38) !== 0x38)
           $add('warn', "$bn: $sn is not distributing (LACP state: " . net_lacp_state($s['actor_state']) . ')', $bn, "bond|$bn|$sn|dist", $s['actor_state']);
+        // The switch side must be in sync, collecting and distributing as well; "defaulted"/"expired" mean this
+        // member is using default partner information or has stopped hearing LACPDUs from the switch.
+        elseif ($s['partner_state'] !== null && ($s['partner_state'] & 0x38) !== 0x38)
+          $add('warn', "$bn: the switch side of $sn is not distributing (partner LACP state: " . net_lacp_state($s['partner_state']) . ')', $bn, "bond|$bn|$sn|pdist", $s['partner_state']);
+        elseif ($s['actor_state'] !== null && ($s['actor_state'] & 0xC0))
+          $add('warn', "$bn: $sn " . (($s['actor_state'] & 0x80) ? 'stopped receiving LACPDUs from the switch (expired)' : 'uses default partner information (no LACPDUs from the switch)') . ' (LACP state: ' . net_lacp_state($s['actor_state']) . ')', $bn, "bond|$bn|$sn|stale", $s['actor_state']);
       }
       $partners = array_unique(array_filter(array_column($up, 'partner_mac'), fn($x) => $x !== '' && $x !== '00:00:00:00:00:00'));
       if (count($partners) > 1) $add('warn', "$bn: members see different LACP partners (" . implode(', ', $partners) . ')', $bn, "bond|$bn|partners", implode(',', $partners));

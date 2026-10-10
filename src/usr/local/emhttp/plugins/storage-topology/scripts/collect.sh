@@ -20,7 +20,10 @@ if ! flock -n 9; then
 fi
 [ "$MAXAGE" -gt 0 ] && fresh && exit 0
 
-rm -rf "$CACHE"/new.*
+# Stale staging folders of earlier runs: only this collector's own (new.<pid>, a directory).
+for d in "$CACHE"/new.*; do
+  [ -d "$d" ] && [[ ${d##*/} =~ ^new\.[0-9]+$ ]] && rm -rf -- "$d"
+done
 NEW="$CACHE/new.$$"
 mkdir -p "$NEW"
 

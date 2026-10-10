@@ -19,7 +19,10 @@ if ! flock -n 9; then
 fi
 [ "$MAXAGE" -gt 0 ] && fresh && exit 0
 
-rm -rf "$CACHE"/new.*
+# Stale staging folders of earlier runs: only this collector's own (new.<pid>, a directory).
+for d in "$CACHE"/new.*; do
+  [ -d "$d" ] && [[ ${d##*/} =~ ^new\.[0-9]+$ ]] && rm -rf -- "$d"
+done
 NEW="$CACHE/new.$$"
 mkdir -p "$NEW"
 
@@ -49,7 +52,9 @@ done
 
 # Driver counters worth keeping from ethtool -S (global ones; per-queue counters are dropped).
 KEEP='err|drop|discard|crc|symbol|fec|corrected|link_down|carrier|missed|fifo|out_of_buffer'
-QUEUE='^((rx|tx|ch|ptp|xsk|xdp|qos)[0-9]+_|(rx|tx)_queue_[0-9]+_|(rx|tx)-[0-9]+\.|Queue\[|\[[0-9]+\]|.*_q[0-9]+_)'
+# Per-queue, per-ring and per-priority counters (mlx5 rx0_/rx_prio0_, ixgbe/ice rx_queue_0_, i40e rx-0., ena queue_0_,
+# bnxt [0], atlantic Queue[0], rxq0/txq0, _q0_, _tc0_) duplicate the port totals, so they are dropped.
+QUEUE='^((rx|tx|ch|ptp|xsk|xdp|qos)[0-9]+_|(rx|tx)_queue_[0-9]+_|(rx|tx)-[0-9]+\.|queue_[0-9]+_|(rx|tx)q[0-9]+|Queue\[|\[[0-9]+\]|.*_q[0-9]+_|.*_(prio|tc|pcp|ring)[0-9]+_)'
 
 declare -A PCI
 for i in "${IFACES[@]}"; do
@@ -126,6 +131,16 @@ done >"$NEW/bridges.txt"
 # LLDP neighbours from lldpd (e.g. the ulldpd plugin). json0 keeps the same structure for one or many values.
 if command -v lldpctl >/dev/null; then
   run lldp.json 10 lldpctl -f json0 || run lldp.json 10 lldpctl -f json
+fi
+
+# Publication guard: a run that found no interface, or whose ethtool failed on every port, keeps the last good
+# collection (the page says the collector failed) instead of replacing it with an empty one.
+okports=0
+for i in "${IFACES[@]}"; do [ -s "$NEW/ethtool_$i" ] && okports=$((okports + 1)); done
+if [ "$okports" -eq 0 ] && [ -s "$CACHE/current/ifaces.txt" ]; then
+  echo "collect-net: no interface could be read (${#IFACES[@]} found); keeping the previous collection" >&2
+  rm -rf -- "$NEW"
+  exit 3
 fi
 
 NOW=$(date +%s)
