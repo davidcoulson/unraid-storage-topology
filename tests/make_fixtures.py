@@ -24,6 +24,9 @@ Layouts:
                          OEM SAS3008 in IT mode with storcli, which reports no controller status and no PHYs for it;
                          x4 with one cable to an expander card whose SES PSU element is Unsupported with junk DC
                          over-voltage/over-current bits. Four SATA drives in its bays, one spun down.
+  supermicro-846-836     9400-16i-like HBA cabled to two Supermicro backplanes (Supermicro OUI addresses): a
+                         BPN-SAS3-846EL1 (SAS3x40, 24 bays, 20 disks, one locate LED on, one host-requested fault LED)
+                         and a BPN-SAS3-836EL1 (SAS3x28, 16 bays, 10 disks), for the front-panel bay layouts.
 
 Not written here (real data, anonymised with include/anonymise.php, kept as they are):
   netapp-ds424-pages     NetApp DS424 IOM12: sg_ses --json --join and pages 1, 2, 7 and 0Ah from the same shelf, to
@@ -600,9 +603,65 @@ def oem_3008_expander_card():
     k.files(d)
 
 
+def supermicro():
+    """9400-16i-like HBA with C0 (PHYs 0-3) to a Supermicro BPN-SAS3-846EL1 (LSI SAS3x40 expander, 24 array device slots)
+    and C1 (PHYs 4-7) to a BPN-SAS3-836EL1 (SAS3x28, 16 slots), the expanders and enclosure IDs on Supermicro's OUI
+    (50030480...). SATA disks: 20 in the 846 (bays 20-23 empty; bay 5 with its locate LED on, bay 7 with the fault LED
+    requested by host software) and 10 in the 836 (bays 0-9)."""
+    d = os.path.join(ROOT, 'supermicro-846-836')
+    k = Kernel(0, 16, 0x500605b0f00d0000)
+    lss, blk, disks, bays, timings = '', [], [], '', ''
+    letters = iter([f'sd{a}' for a in 'bcdefghijklmnopqrstuvwxyz'] + [f'sda{a}' for a in 'abcdefghijklm'])
+    model = 'ST16000NM001G-2KK103'
+    pool = 0
+    for i, (sas, product, nslots, ndisks, phys, sg) in enumerate([(0x5003048001f0a03f, 'SAS3x40', 24, 20, [0, 1, 2, 3], 'sg30'),
+                                                                   (0x5003048001f0b03f, 'SAS3x28', 16, 10, [4, 5, 6, 7], 'sg31')]):
+        x = k.expander(phys, sas, product, 40 if nslots == 24 else 28, '12.0 Gbit', '12.0 Gbit', vendor='LSI')
+        ses_hctl = k.behind(x, 39 if nslots == 24 else 27, sas - 2, 'ssp', 13, 'LSI', product, '')
+        lss += lsscsi_line(ses_hctl, 'enclosu', 'LSI', product, '1501', '-', f'/dev/{sg}')
+        enc_id = f'0x{sas - 1:016x}'
+        els = [element(23, 'Array device slot', -1, 'Unsupported')]
+        for b in range(nslots):
+            if b < ndisks:
+                dev = next(letters)
+                dsas = 0x5003048001f00000 + 0x1000 * i + 0x10 + b
+                hctl = k.behind(x, b, dsas, 'sata', 0, 'ATA', model, dev)
+                lss += lsscsi_line(hctl, 'disk', 'ATA', 'ST16000NM001G-2K', 'SN03', f'/dev/{dev}', f'/dev/sg{len(blk)}')
+                blk.append((dev, f'ZLSM{i}{b:03d}', f'0x5000c500d{i}{b:06x}', 'sas', model, '14.6T'))
+                if i == 0 and b < 2:
+                    name, typ = ('parity', 'Parity') if b == 0 else ('parity2', 'Parity')
+                elif i == 1 and b >= 8:
+                    pool += 1
+                    name, typ = ('cache' if pool == 1 else f'cache{pool}'), 'Cache'
+                else:
+                    name, typ = f'disk{len([x for x in disks if x[1]["type"] == "Data"]) + 1}', 'Data'
+                disks.append((name, {'name': name, 'device': dev, 'type': typ, 'status': 'DISK_OK', 'temp': str(30 + b % 7),
+                                     'spundown': '0', 'numErrors': '0'}))
+                bays += f'{ses_hctl}|{enc_id}|Slot{b:02d}|{b}|OK|{int(i == 0 and b == 7)}|{int(i == 0 and b == 5)}|{dev}\n'
+                els.append(element(23, 'Array device slot', b, 'OK', fault_sensed=0, fault_reqstd=int(i == 0 and b == 7),
+                                   ident=int(i == 0 and b == 5), aes=slot_aes(b, dsas, sas)))
+            else:
+                bays += f'{ses_hctl}|{enc_id}|Slot{b:02d}|{b}|not installed|0|0|\n'
+                els.append(element(23, 'Array device slot', b, 'Not installed', fault_sensed=0, fault_reqstd=0, ident=0,
+                                   aes=slot_aes(b, 0, sas)))
+        els += [element(4, 'Temperature sensor', -1, 'Unsupported'), temp(0, 34 + i)]
+        els += [element(14, 'Enclosure', -1, 'Unsupported'), encl_el(0)]
+        write(d, f'ses_{sg}.json', ses_json(els))
+        timings += f'ses_{sg}.json|0|70\n'
+    common(d, timings)
+    write(d, 'lsscsi.txt', lss)
+    write(d, 'enclosure_sysfs.txt', bays)
+    write(d, 'sas_hosts.txt', 'host0|mpt3sas|"HBA 9400-16i"|24.00.00.00|0000:03:00.0\n')
+    write(d, 'scsi_hosts.txt', 'host0|mpt3sas\nhost1|ahci\n')
+    write(d, 'lsblk.json', lsblk(blk))
+    write(d, 'disks.ini', ini(disks))
+    write(d, 'devs.ini', '')
+    k.files(d)
+
+
 GENERATED = ['it-mode-sas3224', 'usb-short-ses', 'hba-wide-8', 'hba-wide-4-c1-unused', 'hba-partial-c1',
              'hba-dual-expander', 'storcli-direct', 'emc-ktn-stl3', 'emc-ktn-stl3-pages', 'netapp-single-path',
-             'it-mode-3008-partial-storcli']
+             'it-mode-3008-partial-storcli', 'supermicro-846-836']
 
 
 def main():
@@ -621,6 +680,7 @@ def main():
     emc()
     netapp_single_path()
     oem_3008_expander_card()
+    supermicro()
 
 
 if __name__ == '__main__':

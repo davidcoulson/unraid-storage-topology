@@ -19,6 +19,7 @@ $m = topo_load();
 if ($rc !== 0) array_unshift($m['problems'], ['level' => 'warn', 'text' => "Collector exit $rc - showing the last good data." . ($out ? ' ' . implode(' ', $out) : ''),
                                               'key' => 'collector-exit', 'value' => (string)$rc]);
 st_acks_apply($m, 'storage');
+$layouts = st_layouts_read();
 
 $unitF = ($display['unit'] ?? 'C') === 'F';
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
@@ -61,12 +62,18 @@ table.st td.num{text-align:right;white-space:nowrap}
 .st-bay{border:1px solid rgba(128,128,128,.35);border-left:4px solid rgba(128,128,128,.35);border-radius:4px;padding:4px 6px;font-size:.86em;line-height:1.35;min-height:62px}
 .st-bay.ok{border-left-color:#2e7d32}.st-bay.info{border-left-color:#1e88e5}.st-bay.warn{border-left-color:#e68a00}.st-bay.crit{border-left-color:#d32f2f}.st-bay.empty{opacity:.45}
 .st-bay b{font-size:1.05em}.st-bay .n{float:right;opacity:.6}
+.st-front-wrap{overflow-x:auto;margin:6px 0}
+.st-bays.st-front{grid-template-columns:repeat(var(--cols),minmax(140px,1fr));margin:0;padding:6px;border:2px solid rgba(128,128,128,.45);border-radius:6px;background:rgba(128,128,128,.06)}
+.st-bays.st-front.st-narrow{grid-template-columns:repeat(var(--cols),minmax(58px,1fr))}
+.st-narrow .st-bay{min-height:110px;font-size:.8em;overflow-wrap:anywhere}.st-narrow .st-bay .n{float:none;display:block}
+.st-bay.none{border-style:dashed;opacity:.35}
+.st-layout-pick{font-weight:normal;font-size:.9em;margin-left:12px}.st-layout-pick select{min-width:0;margin:0 0 0 4px;padding:1px 4px}
 .st-sensors{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
 .st-problems{margin:6px 0 0 0;padding-left:18px}.st-problems li{margin:2px 0}
 .st-flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:.95em}
 .st-ack{margin-left:10px;font-size:.85em;opacity:.7}.st-acked{margin:4px 0 0 0}.st-acked summary{cursor:pointer}
 tr.st-dim td{opacity:.55}
-@media (max-width:900px){.st-bays{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:900px){.st-bays{grid-template-columns:repeat(3,1fr)}.st-bays.st-front{grid-template-columns:repeat(var(--cols),minmax(110px,1fr))}}
 </style>
 <div class="st-wrap">
 <p>
@@ -185,7 +192,8 @@ tr.st-dim td{opacity:.55}
 <div class="st-card">
 <h3><i class="fa fa-server"></i> <?=$h($s['label'])?> <span class="st-dim"><?=$h("{$s['vendor']} {$s['product']}")?></span> <?=$chip($sl, $lvlText[$sl])?>
 <span class="st-dim" style="font-size:.8em"><?=implode(' &middot; ', array_filter([$s['eid'] !== null ? "storcli e{$s['eid']}" : '', 'SES ' . $h(implode(', ', $s['sg'])),
-  $s['serial'] !== '' ? 'SN ' . $h($s['serial']) : '', count($drives) . ' drives']))?></span>
+  $s['serial'] !== '' ? 'SN ' . $h($s['serial']) : '', count($drives) . ' drives',
+  $s['layout_auto'] ? $h(TOPO_LAYOUTS[$s['layout_auto']]['name'] . ' backplane') : '']))?></span>
 <?=$s['fault_explained'] ? "<span class='st-{$s['level']}' style='font-size:.85em'>(shelf fault LED on)</span>" : ''?>
 <?=!empty($s['io']['drives']) ? "<span style='font-size:.8em'>" . $ioChip($s['io']['links'] ? $s['io'] : ['capacity' => 0] + $s['io'], $s['io']['links'] . ' direct link' . ($s['io']['links'] > 1 ? 's' : '') . ' to the controller') . '</span>' : ''?></h3>
 
@@ -235,45 +243,82 @@ if ($g['psu'] || $g['fan'] || $g['volt'] || $g['amp']):?>
 </div>
 <?endif;?>
 
-<h4>Bays</h4>
-<div class="st-bays">
-<?foreach ($g['slot'] as $x):
+<?// Bays, laid out as the chassis front panel when its layout is known (TOPO_LAYOUTS), else in SES order.
+$chosen = $layouts[$s['key']] ?? null;
+[$lay, $pos, $extra] = topo_bay_map($s, $chosen === 'grid' ? null : ($chosen ?? $s['layout_auto']));
+$auto = $s['layout_auto'] ? TOPO_LAYOUTS[$s['layout_auto']]['name'] : 'plain grid';
+$narrow = $lay && $lay['cols'] > 8;
+$bayTile = function (array $x, string $label, string $style) use ($drives, $h, $diskLink, $temp, $rate, $narrow) {
   $d = $drives[$x['slot']] ?? null;
+  $n = '<span class="n">' . $h($label) . '</span>';
+  $sesTip = (string)$x['slot'] !== $label ? "SES slot {$x['slot']}\n" : '';
   // Which fault bit lights the bay's fault LED: sensed by the shelf (a problem), or requested by host software (info).
   $faultTip = !empty($x['fault_sensed']) ? "\nFault LED: the shelf reports a fault (fault sensed)"
     : (!empty($x['fault_reqstd']) ? "\nFault LED: turned on by host software (fault requested), not a shelf-detected fault. Clear with: {$x['clear_cmd']}" : '');
   $faultTag = !empty($x['fault_sensed']) ? "<span class='st-warn' title='The shelf reports a fault in this bay (fault sensed)'>fault sensed</span>"
     : (!empty($x['fault_reqstd']) ? "<span class='st-info' title='Fault LED turned on by host software (fault requested), not a shelf-detected fault'>fault LED by host</span>" : '');
+  if (!empty($x['ident'])) $faultTag .= ($faultTag ? ' ' : '') . "<span class='st-info' title='The locate (identify) LED of this bay is on'>locate LED on</span>";
   if (!$d) {
     $cls = $x['level'] === 'absent' ? 'empty' : ($x['level'] === 'ok' ? 'warn' : $x['level']);
     if (!empty($x['fault_sensed']) && $cls === 'empty') $cls = 'warn';
-    echo "<div class='st-bay $cls'" . ($faultTip ? " title='{$h(ltrim($faultTip))}'" : '') . "><span class='n'>{$x['slot']}</span>"
-      . ($x['level'] === 'absent' ? 'empty' : $h($x['status']) . '<br><span class="st-dim">no disk linked to this bay</span>') . ($faultTag ? "<br>$faultTag" : '') . '</div>';
-    continue;
+    $tip = ltrim($sesTip . ($x['level'] === 'absent' ? 'Empty' : "SES: {$x['status']}, no disk linked to this bay") . $faultTip);
+    return "<div class='st-bay $cls'$style title='{$h($tip)}'>$n" . ($x['level'] === 'absent' ? 'empty' : $h($x['status'])
+      . ($narrow ? '' : '<br><span class="st-dim">no disk linked to this bay</span>')) . ($faultTag ? "<br>$faultTag" : '') . '</div>';
   }
   $dl = topo_worst(array_filter([
     ($d['smart_alert'] || (int)$d['pred_fail'] > 0 || ($d['state'] !== '' && !in_array($d['state'], ['Onln', 'JBOD', 'UGood'], true))) ? 'crit' : null,
     ((int)$d['media_err'] > 0 || !empty($x['fault_sensed']) || in_array($x['level'], ['warn', 'crit'], true)) ? 'warn' : null,
     ((int)$d['other_err'] > 0 || !empty($x['fault_reqstd']) || ($d['max_rate'] && $d['rate'] < $d['max_rate'])) ? 'info' : null,
   ]));
-  $tip = "{$d['vendor']} {$d['model']} SN {$d['serial']} FW {$d['fw']}\n{$d['size']} {$d['intf']} {$d['state']}\nSES: {$x['status']}" . ($x['ident'] ? ' (locate LED on)' : '') . $faultTip;
+  $tip = $sesTip . trim("{$d['vendor']} {$d['model']}") . " SN {$d['serial']} FW {$d['fw']}\n{$d['size']} {$d['intf']} {$d['state']}"
+    . ($d['unraid'] ? "\nUnraid: {$d['unraid']}" . ($d['unraid_type'] ? " ({$d['unraid_type']})" : '') : '') . ($d['dev'] ? " /dev/{$d['dev']}" : '')
+    . "\nSES: {$x['status']}" . (!empty($x['ident']) ? ' (locate LED on)' : '') . $faultTip;
+  $out = "<div class=\"st-bay $dl\"$style title=\"{$h($tip)}\">$n<b>{$diskLink($d)}</b>";
+  if ($narrow) return $out . ($faultTag ? "<br>$faultTag" : '') . '</div>';
+  return $out . ($d['dev'] && $d['unraid'] ? " <span class='st-dim'>{$h($d['dev'])}</span>" : '')
+    . ($d['unraid_type'] ? " <span class='st-dim'>{$h($d['unraid_type'])}</span>" : '') . '<br>'
+    . "<span class='st-dim'>{$h($d['size'])} {$h($d['model'])}</span><br>"
+    . $temp($d['temp']) . ' &middot; ' . $rate($d['rate']) . ($d['max_rate'] && $d['rate'] < $d['max_rate'] ? "<span class='st-dim'>/{$rate($d['max_rate'])}</span>" : '')
+    . ((int)$d['other_err'] || (int)$d['media_err'] ? " &middot; <span class='st-warn'>err " . (int)$d['media_err'] . '/' . (int)$d['other_err'] . '</span>' : '')
+    . ($faultTag ? "<br>$faultTag" : '') . '</div>';
+};
+$opt = fn($v, $text) => "<option value='{$h($v)}'" . (($chosen ?? 'auto') === $v ? ' selected' : '') . ">{$h($text)}</option>";
 ?>
-<div class="st-bay <?=$dl?>" title="<?=$h($tip)?>"><span class="n"><?=$x['slot']?></span>
-<b><?=$diskLink($d)?></b><?=$d['dev'] && $d['unraid'] ? " <span class='st-dim'>{$h($d['dev'])}</span>" : ''?><br>
-<span class="st-dim"><?=$h($d['size'])?> <?=$h($d['model'])?></span><br>
-<?=$temp($d['temp'])?> &middot; <?=$rate($d['rate'])?><?=$d['max_rate'] && $d['rate'] < $d['max_rate'] ? "<span class='st-dim'>/{$rate($d['max_rate'])}</span>" : ''?>
-<?=(int)$d['other_err'] || (int)$d['media_err'] ? " &middot; <span class='st-warn'>err " . (int)$d['media_err'] . '/' . (int)$d['other_err'] . '</span>' : ''?>
-<?=$faultTag ? "<br>$faultTag" : ''?>
+<h4>Bays<?=$lay ? " <span class='st-dim'>front view, " . $h("{$lay['name']} ({$lay['backplane']})") . '</span>' : ''?>
+<?if ($g['slot']):?><span class="st-layout-pick st-dim">Layout<select class="st-layout" data-shelf="<?=$h($s['key'])?>">
+<?=$opt('auto', "Auto: $auto")?><?foreach (TOPO_LAYOUTS as $id => $l) echo $opt($id, "{$l['name']} ({$l['bays']} bays)");?><?=$opt('grid', 'Plain grid (SES order)')?>
+</select> <span class="st-layout-msg"></span></span><?endif;?></h4>
+<?if ($lay):?>
+<p class="st-dim" style="margin:2px 0"><?=$chosen === null && $s['layout_why'] ? 'Identified from the ' . $h($s['layout_why']) . '. ' : 'Layout picked on this page. '?>
+Bay numbers as printed by Supermicro: <?=$lay['order'] === 'up' ? "bay {$lay['first']} at the bottom left, counting up each column, then the next column to the right"
+  : "bay {$lay['first']} at the left, counting to the right"?>.<?=count($g['slot']) !== $lay['bays'] ? ' This shelf reports ' . count($g['slot']) . " SES bays, the layout has {$lay['bays']}." : ''?></p>
+<div class="st-front-wrap"><div class="st-bays st-front<?=$narrow ? ' st-narrow' : ''?>" style="--cols:<?=$lay['cols']?>">
+<?$taken = [];
+foreach ($g['slot'] as $x) if (isset($pos[$x['slot']])) {
+  $p = $pos[$x['slot']]; $taken["{$p['row']}:{$p['col']}"] = true;
+  echo $bayTile($x, $p['label'], " style=\"grid-row:{$p['row']};grid-column:{$p['col']}\"") . "\n";
+}
+// Positions without an SES bay (the shelf reports fewer bays than the layout has).
+for ($i = 0; $i < $lay['bays']; $i++) {
+  [$r, $c] = $lay['order'] === 'up' ? [$lay['rows'] - $i % $lay['rows'], intdiv($i, $lay['rows']) + 1] : [intdiv($i, $lay['cols']) + 1, $i % $lay['cols'] + 1];
+  if (!isset($taken["$r:$c"])) echo "<div class='st-bay none' style='grid-row:$r;grid-column:$c' title='No SES bay for this position'><span class='n'>" . ($i + $lay['first']) . '</span></div>';
+}?>
+</div></div>
+<?if ($extra):?><h4>SES bays outside this layout</h4><div class="st-bays">
+<?foreach ($g['slot'] as $x) if (in_array($x['slot'], $extra, true)) echo $bayTile($x, (string)$x['slot'], '') . "\n";?>
+</div><?endif;?>
+<?else:?>
+<div class="st-bays">
+<?foreach ($g['slot'] as $x) echo $bayTile($x, (string)$x['slot'], '') . "\n";?>
 </div>
-<?endforeach;?>
-</div>
+<?endif;?>
 
 <?if ($drives):?>
 <details><summary>Drive details (<?=count($drives)?>)</summary>
 <table class="st">
 <tr><th>Bay</th><th>Disk</th><th>Device</th><th>Model</th><th>Serial</th><th>FW</th><th>Size</th><th>Temp</th><th>Link</th><th>Paths</th><th>Media err</th><th>Other err</th><th>Pred. fail</th><th>SMART</th></tr>
 <?foreach ($drives as $d):?>
-<tr><td><?=$d['slot']?></td><td><?=$diskLink($d)?><?=$d['unraid_type'] ? " <span class='st-dim'>{$h($d['unraid_type'])}</span>" : ''?></td><td><?=$h($d['dev'])?></td>
+<tr><td><?=$h($pos[$d['slot']]['label'] ?? $d['slot'])?></td><td><?=$diskLink($d)?><?=$d['unraid_type'] ? " <span class='st-dim'>{$h($d['unraid_type'])}</span>" : ''?></td><td><?=$h($d['dev'])?></td>
 <td><?=$h($d['model'])?></td><td><?=$h($d['serial'])?></td><td><?=$h($d['fw'])?></td><td class="num"><?=$h($d['size'])?></td><td class="num"><?=$temp($d['temp'])?></td>
 <td><?=$chip($d['max_rate'] && $d['rate'] < $d['max_rate'] ? 'info' : 'ok', $rate($d['rate']) . ($d['max_rate'] ? ' of ' . $rate($d['max_rate']) : ''))?></td>
 <td><?foreach ($d['paths'] as $p) echo $chip($p['status'] === 'Active' ? 'ok' : 'warn', "P{$p['port']} {$rate($p['rate'])}", $p['sas']) . ' ';?></td>
@@ -358,3 +403,4 @@ It does not track every slot, so check Main for the drives themselves. Its volta
 <p class="st-dim">Cache: <code>/var/local/storage-topology/current</code>. Timings: <?=$h(implode(', ', array_map(fn($k, $t) => "$k {$t['ms']} ms", array_keys($m['timings']), $m['timings'])))?>.</p>
 </div>
 <?=st_problems_js($var['csrf_token'] ?? '')?>
+<?=st_layout_js($var['csrf_token'] ?? '')?>

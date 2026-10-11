@@ -2,8 +2,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.18">
-<!ENTITY md5        "eb32a5b0072864a7b517035e413b4374">
+<!ENTITY version    "2026.10.19">
+<!ENTITY md5        "f9d0fb09c467fde38143bfbc5b601f37">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
@@ -24,6 +24,10 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.19
+- Front-panel bay layout: Supermicro backplanes (recognised by Supermicro's SAS address prefix 50030480 or an SMC SES vendor, and their bay count) are drawn as the chassis front with Supermicro's printed bay numbers: SC846/SC847 front (BPN-SAS3-846EL, 24 bays, 4 columns of 6), SC836 (BPN-SAS3-836EL, 16 bays) and SC826 (BPN-SAS3-826EL, 12 bays, numbered 1-12), bay 0 (or 1) at the bottom left, counting up each column. SC216 (24 bays in a row) can be picked by hand.
+- Each shelf's layout can be changed on the page (Auto, a chassis, or the plain grid in SES order); the choice is kept in /boot/config/plugins/storage-topology/layouts.json.
+- Bays show the Unraid assignment (Parity, Data, Cache/pool) and the locate LED.
 ###2026.10.18
 - Throughput and link utilization: each controller and shelf shows read/write rates (from the kernel's disk counters around each collection) and the share of its SAS link capacity (1.2 GB/s per 12G lane).
 - Bays are tied to their disks through each disk's cached identification page (VPD 83h port addresses), so Unraid disk names, devices and throughput show even while a disk is spun down (storcli's per-drive detail is still skipped then). Nothing is sent to the drives.

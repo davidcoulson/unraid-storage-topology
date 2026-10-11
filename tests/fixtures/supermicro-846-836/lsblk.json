@@ -1,0 +1,244 @@
+{
+ "blockdevices": [
+  {
+   "name": "sdb",
+   "serial": "ZLSM0000",
+   "wwn": "0x5000c500d0000000",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdc",
+   "serial": "ZLSM0001",
+   "wwn": "0x5000c500d0000001",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdd",
+   "serial": "ZLSM0002",
+   "wwn": "0x5000c500d0000002",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sde",
+   "serial": "ZLSM0003",
+   "wwn": "0x5000c500d0000003",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdf",
+   "serial": "ZLSM0004",
+   "wwn": "0x5000c500d0000004",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdg",
+   "serial": "ZLSM0005",
+   "wwn": "0x5000c500d0000005",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdh",
+   "serial": "ZLSM0006",
+   "wwn": "0x5000c500d0000006",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdi",
+   "serial": "ZLSM0007",
+   "wwn": "0x5000c500d0000007",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdj",
+   "serial": "ZLSM0008",
+   "wwn": "0x5000c500d0000008",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdk",
+   "serial": "ZLSM0009",
+   "wwn": "0x5000c500d0000009",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdl",
+   "serial": "ZLSM0010",
+   "wwn": "0x5000c500d000000a",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdm",
+   "serial": "ZLSM0011",
+   "wwn": "0x5000c500d000000b",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdn",
+   "serial": "ZLSM0012",
+   "wwn": "0x5000c500d000000c",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdo",
+   "serial": "ZLSM0013",
+   "wwn": "0x5000c500d000000d",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdp",
+   "serial": "ZLSM0014",
+   "wwn": "0x5000c500d000000e",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdq",
+   "serial": "ZLSM0015",
+   "wwn": "0x5000c500d000000f",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdr",
+   "serial": "ZLSM0016",
+   "wwn": "0x5000c500d0000010",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sds",
+   "serial": "ZLSM0017",
+   "wwn": "0x5000c500d0000011",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdt",
+   "serial": "ZLSM0018",
+   "wwn": "0x5000c500d0000012",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdu",
+   "serial": "ZLSM0019",
+   "wwn": "0x5000c500d0000013",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdv",
+   "serial": "ZLSM1000",
+   "wwn": "0x5000c500d1000000",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdw",
+   "serial": "ZLSM1001",
+   "wwn": "0x5000c500d1000001",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdx",
+   "serial": "ZLSM1002",
+   "wwn": "0x5000c500d1000002",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdy",
+   "serial": "ZLSM1003",
+   "wwn": "0x5000c500d1000003",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdz",
+   "serial": "ZLSM1004",
+   "wwn": "0x5000c500d1000004",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdaa",
+   "serial": "ZLSM1005",
+   "wwn": "0x5000c500d1000005",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdab",
+   "serial": "ZLSM1006",
+   "wwn": "0x5000c500d1000006",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdac",
+   "serial": "ZLSM1007",
+   "wwn": "0x5000c500d1000007",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdad",
+   "serial": "ZLSM1008",
+   "wwn": "0x5000c500d1000008",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  },
+  {
+   "name": "sdae",
+   "serial": "ZLSM1009",
+   "wwn": "0x5000c500d1000009",
+   "tran": "sas",
+   "model": "ST16000NM001G-2KK103",
+   "size": "14.6T"
+  }
+ ]
+}

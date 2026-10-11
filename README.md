@@ -21,8 +21,16 @@ Two read-only pages in **Tools → System Information**:
   with cable vendor, part and serial where the enclosure reports them.
 - **Disk shelves**: I/O modules (status, firmware, serial), power supplies (status, firmware, rating),
   fans, voltages, currents and temperature sensors, and a bay grid.
-- **Bays and drives**: each bay with its Unraid disk name (linked to the disk page), size, model,
-  temperature, negotiated vs maximum link rate, both SAS paths, and media/other/predictive-failure counts.
+- **Bays and drives**: each bay with its Unraid disk name (linked to the disk page) and assignment (Parity, Data,
+  Cache/pool), device, size, model, temperature, negotiated vs maximum link rate, both SAS paths,
+  media/other/predictive-failure counts, and the bay's fault and locate LEDs.
+- **Front-panel bay layout**: Supermicro backplanes are recognised by Supermicro's OUI (00:30:48) in the enclosure ID
+  or expander SAS address (or an SMC/Supermicro SES vendor) and their bay count, and their bays are drawn as the
+  chassis front with the numbers Supermicro prints: SC846/SC847 front (BPN-SAS3-846EL1/EL2, 24 bays, 4 columns of 6),
+  SC836 (BPN-SAS3-836EL1/EL2, 16 bays, 4 x 4) and SC826 (BPN-SAS3-826EL1/EL2, 12 bays, 4 x 3, numbered 1-12), each
+  counted up each column from the bottom left; SC216 (24 bays in one row) can be picked by hand. Other shelves keep
+  the grid in SES order. The layout of each shelf can be changed on the page; the choice is kept in
+  `/boot/config/plugins/storage-topology/layouts.json`.
 - **Firmware overview**: every controller, I/O module, PSU and drive model with its versions; parts of the
   same kind running different versions are highlighted.
 - **Simple enclosures**: USB drive boxes and enclosures that only support the SES short status page (one status
@@ -42,7 +50,7 @@ Two read-only pages in **Tools → System Information**:
 
 Nothing is changed on the system: the plugin only runs `storcli … show … J nolog`, `sg_ses` status and
 configuration pages, `lsscsi`, `lsblk`, and reads sysfs and emhttp's `disks.ini`. The only file it writes outside
-its RAM cache is `acks.json`, and only when you press Acknowledge.
+its RAM cache is `acks.json`, and only when you press Acknowledge, and `layouts.json`, only when you pick a bay layout.
 
 Enclosure data comes from `sg_ses --json --join`. Where that fails (sg_ses 2.86, from sg3_utils 1.48, crashes there
 on enclosures without an element descriptor page, such as the EMC KTN-STL3), the collector reads the pages it joins

@@ -16,6 +16,22 @@ if (!defined('TOPO_CACHE')) define('TOPO_CACHE', getenv('ST_TOPO_CACHE') ?: '/va
 // identifies by the "sata" target protocol of their SAS end device (or the "ATA" SCSI vendor string).
 const TOPO_SATA_MAX = 6.0;
 
+/* Front panels of chassis whose bay numbering is known, from the vendors' backplane manuals (drive connector
+ * figures, seen from the front of the chassis). cols x rows; 'order' is how the printed bay numbers run: 'up' = up
+ * each column from the bottom-left, then the next column to the right; 'across' = left to right along the row.
+ * 'first' is the number printed on the first bay. A shelf's first SES bay is put in its first position. */
+const TOPO_LAYOUTS = [
+  'sm-846' => ['name' => 'Supermicro SC846 / SC847 front', 'backplane' => 'BPN-SAS3-846EL1/EL2, BPN-SAS2-846EL', 'bays' => 24, 'cols' => 4, 'rows' => 6, 'order' => 'up', 'first' => 0],
+  'sm-836' => ['name' => 'Supermicro SC836', 'backplane' => 'BPN-SAS3-836EL1/EL2', 'bays' => 16, 'cols' => 4, 'rows' => 4, 'order' => 'up', 'first' => 0],
+  'sm-826' => ['name' => 'Supermicro SC826', 'backplane' => 'BPN-SAS3-826EL1/EL2', 'bays' => 12, 'cols' => 4, 'rows' => 3, 'order' => 'up', 'first' => 1],
+  'sm-216' => ['name' => 'Supermicro SC216', 'backplane' => 'BPN-SAS3-216EL1/EL2', 'bays' => 24, 'cols' => 24, 'rows' => 1, 'order' => 'across', 'first' => 0],
+];
+// Supermicro's IEEE OUI (00-30-48): their backplane expanders' SAS addresses and enclosure IDs start 5003048.
+const TOPO_OUI_SUPERMICRO = '5003048';
+// The layout guessed from a Supermicro backplane's bay count. 24 bays could also be an SC216 (2.5" bays in one row,
+// same expander chips), which can be picked on the page.
+const TOPO_SM_BY_BAYS = [24 => 'sm-846', 16 => 'sm-836', 12 => 'sm-826'];
+
 function topo_json($file) {
   $raw = @file_get_contents($file);
   if ($raw === false || $raw === '') return null;
@@ -132,6 +148,7 @@ function topo_load(string $dir = TOPO_CACHE): array {
   topo_sysfs_drives($dir, $m, $names, $k);
   topo_shelf_drives($m);
   topo_shelf_paths($m, $k);
+  topo_layouts($m);
   topo_direct($m, $names, $k, $labels);
   topo_links($m, $labels);
   topo_connectors($m, $k);
@@ -846,6 +863,47 @@ function topo_kernel_drive(array $n, string $blk, ?array $end, array $k): array 
     'smart_alert' => false, 'paths' => [], 'multipath' => false, 'unraid_errors' => $n['errors'], 'kernel_paths' => $n['seen'] ?? 1,
     'unraid' => $n['name'], 'unraid_type' => $n['type'], 'dev' => $blk, 'spundown' => $n['spundown'],
   ];
+}
+
+/* Identify each shelf's chassis for its front-panel layout: a Supermicro backplane by the vendor OUI in its
+ * enclosure ID or expander SAS address (or SMC/Supermicro in its SES inquiry data), then by its number of bays.
+ * Sets layout_auto (a TOPO_LAYOUTS key, or null for the plain grid) and layout_why. */
+function topo_layouts(array &$m): void {
+  foreach ($m['shelves'] as $key => &$s) {
+    $addrs = array_merge([$s['wwn']], array_keys(array_filter($m['addr_shelf'], fn($v) => $v === $key)));
+    $oui = (bool)array_filter($addrs, fn($a) => str_starts_with(strtoupper((string)$a), TOPO_OUI_SUPERMICRO));
+    $vendor = (bool)preg_match('/^(SMC|SUPERMICRO|SUPERMCR)\b/i', trim($s['vendor']));
+    $bays = count($s['groups']['slot']);
+    $s['layout_auto'] = null; $s['layout_why'] = '';
+    if (!$oui && !$vendor) continue;
+    $why = ($oui ? 'Supermicro SAS address (OUI 00:30:48)' : "SES vendor {$s['vendor']}") . ", {$s['vendor']} {$s['product']} expander, $bays bays";
+    $s['layout_auto'] = TOPO_SM_BY_BAYS[$bays] ?? null;
+    $s['layout_why'] = $why;
+  }
+  unset($s);
+}
+
+/* Where each SES bay of a shelf goes on the front panel: [layout|null, positions, extra]. positions: SES slot =>
+ * [label, row, col] (row 1 at the top); extra: SES slots the layout has no place for, shown after it. With no layout,
+ * positions are in SES order, 6 to a row, labelled with the SES slot number (the page's plain grid). */
+function topo_bay_map(array $s, ?string $id): array {
+  $slots = array_column($s['groups']['slot'], 'slot');
+  $lay = $id !== null ? (TOPO_LAYOUTS[$id] ?? null) : null;
+  $pos = []; $extra = [];
+  if (!$lay) {
+    foreach (array_values($slots) as $i => $sl) $pos[$sl] = ['label' => (string)$sl, 'row' => intdiv($i, 6) + 1, 'col' => $i % 6 + 1];
+    return [null, $pos, []];
+  }
+  $nums = array_filter($slots, 'is_int');
+  $base = $nums ? min($nums) : 0;                    // SES bays count from 0 or 1
+  foreach ($slots as $sl) {
+    $i = is_int($sl) ? $sl - $base : -1;
+    if ($i < 0 || $i >= $lay['bays']) { $extra[] = $sl; continue; }
+    [$row, $col] = $lay['order'] === 'up' ? [$lay['rows'] - $i % $lay['rows'], intdiv($i, $lay['rows']) + 1]
+                                          : [intdiv($i, $lay['cols']) + 1, $i % $lay['cols'] + 1];
+    $pos[$sl] = ['label' => (string)($i + $lay['first']), 'row' => $row, 'col' => $col];
+  }
+  return [$lay + ['id' => $id], $pos, $extra];
 }
 
 // Attach drives to their shelf: storcli drives by controller + enclosure ID, kernel-view drives by enclosure WWN.

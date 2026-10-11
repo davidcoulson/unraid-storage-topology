@@ -17,6 +17,8 @@ $tmp = sys_get_temp_dir() . '/st-tests.' . getmypid();
 mkdir($tmp, 0700, true);
 define('ST_ACK_FILE', "$tmp/acks.json");
 putenv('ST_ACK_FILE=' . ST_ACK_FILE);
+define('ST_LAYOUT_FILE', "$tmp/layouts.json");
+putenv('ST_LAYOUT_FILE=' . ST_LAYOUT_FILE);
 require_once "$plug/include/topology.php";
 require_once "$plug/include/network.php";
 require_once "$plug/include/common.php";
@@ -489,6 +491,66 @@ $a = st_anon_text($st2, 'x', "aa:bb:cc:11:22:33 AA:BB:CC:11:22:33 00:00:00:00:00
 t($a === 'aa:bb:cc:00:00:01 AA:BB:CC:00:00:01 00:00:00:00:00:00 tower host1.local 0x5000c50000011224 5000C50000011225', 'MACs, hostnames and SAS addresses map consistently (default name "tower" kept): ' . $a);
 
 // ---------------------------------------------------------------------------------------------------------
+$section = 'supermicro-846-836';
+$dir = "$fx/supermicro-846-836";
+$m = load($dir);
+$s846 = $m['shelves']['5003048001F0A03E'] ?? null; $s836 = $m['shelves']['5003048001F0B03E'] ?? null;
+t($s846 && $s836 && count($s846['groups']['slot']) === 24 && count($s836['groups']['slot']) === 16 && count($s846['drives']) === 20 && count($s836['drives']) === 10,
+  'two Supermicro backplanes: 24 bays with 20 disks, 16 bays with 10');
+t(($s846['layout_auto'] ?? '') === 'sm-846' && ($s836['layout_auto'] ?? '') === 'sm-836', 'identified as SC846 and SC836 by OUI and bay count');
+t(($s846['layout_why'] ?? '') === 'Supermicro SAS address (OUI 00:30:48), LSI SAS3x40 expander, 24 bays', 'says why: ' . ($s846['layout_why'] ?? '-'));
+[$lay, $pos, $extra] = topo_bay_map($s846, 'sm-846');
+$at = function ($sl) use (&$pos) { return isset($pos[$sl]) ? "{$pos[$sl]['label']}@{$pos[$sl]['row']},{$pos[$sl]['col']}" : '-'; };
+t($lay['cols'] === 4 && $lay['rows'] === 6 && count($pos) === 24 && !$extra, '846: 24 positions, 4 columns of 6');
+t($at(0) === '0@6,1' && $at(5) === '5@1,1' && $at(6) === '6@6,2' && $at(18) === '18@6,4' && $at(23) === '23@1,4',
+  '846: bay 0 bottom left, up each column, 23 top right: ' . implode(' ', array_map($at, [0, 5, 6, 18, 23])));
+[$lay, $pos] = topo_bay_map($s836, 'sm-836');
+t($at(0) === '0@4,1' && $at(3) === '3@1,1' && $at(4) === '4@4,2' && $at(15) === '15@1,4', '836: 4 x 4, bay 0 bottom left: ' . implode(' ', array_map($at, [0, 3, 4, 15])));
+// SC826 bays are printed 1-12; SES may count its bays from 0 or 1.
+$fake = fn(array $slots) => ['groups' => ['slot' => array_map(fn($n) => ['slot' => $n], $slots)]];
+[, $pos] = topo_bay_map($fake(range(0, 11)), 'sm-826');
+$a0 = [$at(0), $at(11)];
+[, $pos] = topo_bay_map($fake(range(1, 12)), 'sm-826');
+t($a0 === ['1@3,1', '12@1,4'] && [$at(1), $at(12)] === ['1@3,1', '12@1,4'], '826: printed 1-12 from the bottom left, whether SES counts from 0 or 1');
+[, $pos, $extra] = topo_bay_map($fake(range(0, 25)), 'sm-846');
+t(count($pos) === 24 && $extra === [24, 25], 'SES bays beyond the layout are listed apart');
+[, $pos] = topo_bay_map($s846, 'sm-216');
+t($at(0) === '0@1,1' && $at(23) === '23@1,24', 'SC216: one row, left to right');
+[$lay, $pos] = topo_bay_map($s846, null);
+t($lay === null && $at(0) === '0@1,1' && $at(6) === '6@2,1' && topo_bay_map($s846, 'nonsense')[0] === null, 'no layout: SES order, 6 to a row');
+// Other shelves keep the plain grid: Supermicro OUI with 4 bays (no known chassis), NetApp, the AEC expander card.
+foreach (['hba-wide-8', 'netapp-single-path', 'it-mode-3008-partial-storcli'] as $f) {
+  $mm = load("$fx/$f");
+  t(array_column($mm['shelves'], 'layout_auto') === array_fill(0, count($mm['shelves']), null), "$f: no chassis layout");
+}
+// SES vendor SMC without the OUI is a Supermicro backplane too.
+$d2 = "$tmp/sm-vendor";
+copy_dir($dir, $d2);
+foreach (['lsscsi.txt', 'enclosure_sysfs.txt', 'expanders.txt', 'expander_phys.txt', 'end_devices.txt', 'sas_phys.txt'] as $f)
+  file_put_contents("$d2/$f", str_ireplace('5003048', '500a0b8', file_get_contents("$d2/$f")));
+foreach (glob("$d2/ses_*.json") as $f) {
+  $j = json_decode(file_get_contents($f), true);
+  array_walk_recursive($j, function (&$v, $k) { if (is_int($v) && $v > 0x5003048000000000 && $v < 0x5003049000000000) $v += 0x0007080000000000; });
+  file_put_contents($f, json_encode($j));
+}
+file_put_contents("$d2/lsscsi.txt", preg_replace('/(enclosu )LSI     /', '$1SMC     ', file_get_contents("$d2/lsscsi.txt"), 1));
+$m2 = load($d2);
+$auto = array_column($m2['shelves'], 'layout_auto', 'label');
+t(($auto['Shelf sg30'] ?? '') === 'sm-846' && array_key_exists('Shelf sg31', $auto) && $auto['Shelf sg31'] === null && str_starts_with($m2['shelves'][array_key_first($m2['shelves'])]['layout_why'], 'SES vendor SMC'),
+  'SES vendor SMC identifies a Supermicro backplane without the OUI: ' . json_encode($auto));
+// The layout picked on the page, per shelf.
+t(st_layouts_read() === [] && st_layout_write('5003048001F0A03E', 'sm-216') && st_layout_write('5003048001F0B03E', 'grid'), 'layouts written');
+t(st_layouts_read() === ['5003048001F0A03E' => 'sm-216', '5003048001F0B03E' => 'grid'], 'and read back: ' . json_encode(st_layouts_read()));
+t(!st_layout_write('../etc', 'grid') && !st_layout_write('5003048001F0A03E', 'Bad Layout!') && !st_layout_write('', null), 'bad shelf keys and layout names are refused');
+file_put_contents(ST_LAYOUT_FILE, json_encode(['5003048001F0A03E' => 'sm-216', 'x/y' => 'grid', 'sg3' => ['nested']]));
+t(st_layouts_read() === ['5003048001F0A03E' => 'sm-216'], 'invalid entries in the file are ignored');
+t(st_layout_write('5003048001F0A03E', null) && st_layouts_read() === [], 'auto clears the choice');
+for ($i = 0; $i < ST_LAYOUT_MAX + 5; $i++) st_layout_write("sg$i", 'grid');
+$all = st_layouts_read();
+t(count($all) === ST_LAYOUT_MAX && !isset($all['sg0']) && isset($all['sg' . (ST_LAYOUT_MAX + 4)]), 'at most ST_LAYOUT_MAX shelves, oldest dropped');
+@unlink(ST_LAYOUT_FILE);
+
+// ---------------------------------------------------------------------------------------------------------
 $section = 'ack-js';
 // The webGUI never answers multipart/form-data POSTs: the Acknowledge script must send URL-encoded form data, with
 // csrf_token in the body, and report failures next to the link rather than with alert().
@@ -497,6 +559,9 @@ t(str_contains($js, 'new URLSearchParams()') && !str_contains($js, 'FormData'), 
 t(str_contains($js, "append('csrf_token'") && str_contains($js, '"TESTTOKEN"'), 'csrf_token is sent in the body');
 t(!preg_match('/\balert\s*\(/', $js) && str_contains($js, 'Could not save: '), 'failures are shown next to the link, not with alert()');
 t(str_contains(st_diag_html(), "href='/plugins/storage-topology/include/diagnostics.php?anon=1'"), 'diagnostics is a plain GET link');
+$js = st_layout_js('TESTTOKEN');
+t(str_contains($js, 'new URLSearchParams()') && !str_contains($js, 'FormData') && str_contains($js, "append('csrf_token'") && str_contains($js, '"TESTTOKEN"')
+  && str_contains($js, "'/plugins/storage-topology/include/layout.php'") && !preg_match('/\balert\s*\(/', $js), 'layout picker posts URL-encoded data with csrf_token to layout.php, no alert()');
 
 // ---------------------------------------------------------------------------------------------------------
 $section = 'render';
@@ -504,14 +569,18 @@ $section = 'render';
 $docroot = "$tmp/docroot";
 copy_dir($plug, "$docroot/plugins/storage-topology");
 foreach (glob("$docroot/plugins/storage-topology/scripts/*.sh") as $f) { file_put_contents($f, "#!/bin/bash\nexit 0\n"); chmod($f, 0755); }
-$php = PHP_BINARY;
-foreach (glob("$fx/*", GLOB_ONLYDIR) as $d) {
-  $name = basename($d);
-  $cmd = 'ST_TOPO_CACHE=' . escapeshellarg($d) . ' ST_ACK_FILE=' . escapeshellarg(ST_ACK_FILE) . ' ' . escapeshellarg($php) . ' '
-       . escapeshellarg(__DIR__ . '/render.php') . ' ' . escapeshellarg($docroot) . ' StorageTopology.page';
+function render(string $d): array {
+  global $docroot;
+  $cmd = 'ST_TOPO_CACHE=' . escapeshellarg($d) . ' ST_ACK_FILE=' . escapeshellarg(ST_ACK_FILE) . ' ST_LAYOUT_FILE=' . escapeshellarg(ST_LAYOUT_FILE) . ' '
+       . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/render.php') . ' ' . escapeshellarg($docroot) . ' StorageTopology.page';
   $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
   $html = stream_get_contents($pipes[1]); $err = stream_get_contents($pipes[2]);
   proc_close($p);
+  return [$html, $err];
+}
+foreach (glob("$fx/*", GLOB_ONLYDIR) as $d) {
+  $name = basename($d);
+  [$html, $err] = render($d);
   t($err === '', "$name renders without notices: $err");
   t(strlen($html) > 1000 && str_contains($html, '</div>'), "$name renders a page");
   if ($name === 'usb-short-ses') t(str_contains($html, 'No SAS controllers found. This page is for SAS HBAs/RAID controllers and disk shelves; USB enclosures are shown below.')
@@ -526,6 +595,24 @@ foreach (glob("$fx/*", GLOB_ONLYDIR) as $d) {
     && str_contains($html, 'Shelf sg12 expander (AEC-82885T)') && !str_contains($html, 'dc_over_voltage'), '3008 page: status not reported, ports from the kernel, no PSU flags');
   if ($name === 'netapp-single-path') t(!str_contains($html, 'Throughput'), 'no throughput row without diskstats snapshots');
   if ($name === 'it-mode-sas3224') t(str_contains($html, 'Directly attached drives') && !str_contains($html, 'SN &middot;') && !str_contains($html, 'I/O modules'), 'it-mode page: direct table, no empty serial or IOM table');
+  if ($name === 'supermicro-846-836') {
+    t(str_contains($html, "front view, Supermicro SC846 / SC847 front (BPN-SAS3-846EL1/EL2, BPN-SAS2-846EL)") && str_contains($html, 'front view, Supermicro SC836 (BPN-SAS3-836EL1/EL2)')
+      && str_contains($html, 'Identified from the Supermicro SAS address (OUI 00:30:48), LSI SAS3x40 expander, 24 bays.') && substr_count($html, 'class="st-bays st-front"') === 2,
+      'supermicro page: two front views, identified');
+    t((bool)preg_match('/<div class="st-bay ok" style="grid-row:6;grid-column:1" title="[^"]*Unraid: parity \(Parity\) \/dev\/sdb[^"]*"><span class="n">0<\/span><b><a href=\'\/Main\/Device\?name=parity\'>parity<\/a><\/b> <span class=\'st-dim\'>sdb<\/span> <span class=\'st-dim\'>Parity<\/span>/', $html),
+      'bay 0 bottom left: Unraid disk, device and assignment');
+    t((bool)preg_match('/style="grid-row:1;grid-column:1" title="[^"]*locate LED on[^"]*"><span class="n">5</', $html) && str_contains($html, '>locate LED on</span>')
+      && (bool)preg_match('/class="st-bay info" style="grid-row:5;grid-column:2"/', $html), 'bay 5 top left with its locate LED; bay 7 with the host fault LED');
+    t((bool)preg_match("/class='st-bay empty' style=\"grid-row:1;grid-column:4\" title='Empty'><span class=\"n\">23</", $html), 'bay 23 empty, top right');
+    t(str_contains($html, '<select class="st-layout" data-shelf="5003048001F0A03E">') && str_contains($html, "<option value='auto' selected>Auto: Supermicro SC846 / SC847 front</option>")
+      && str_contains($html, "<option value='grid'>Plain grid (SES order)</option>") && str_contains($html, "include/layout.php"), 'layout picker, auto selected');
+    // Picked on the page: SC216 for the first shelf (one row, narrow tiles), the plain grid for the second.
+    st_layout_write('5003048001F0A03E', 'sm-216'); st_layout_write('5003048001F0B03E', 'grid');
+    [$h2, $e2] = render($d);
+    t($e2 === '' && str_contains($h2, 'class="st-bays st-front st-narrow" style="--cols:24"') && substr_count($h2, 'class="st-bays st-front') === 1 && str_contains($h2, 'Layout picked on this page.')
+      && str_contains($h2, "<option value='grid' selected>"), 'picked layouts: SC216 row and plain grid: ' . $e2);
+    @unlink(ST_LAYOUT_FILE);
+  }
 }
 
 rm_dir($tmp);

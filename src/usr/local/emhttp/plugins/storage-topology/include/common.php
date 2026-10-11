@@ -1,6 +1,7 @@
 <?PHP
 /* Shared by both pages: acknowledged problems (stored on the flash drive) and the problems list with its
- * Acknowledge / Unacknowledge controls, plus the diagnostics download link.
+ * Acknowledge / Unacknowledge controls, plus the diagnostics download link. Also the storage page's bay layout
+ * choices (layouts.json, next to acks.json).
  *
  * A problem's id is a hash of its level and key (what it is about, e.g. "shelf|<wwn>|fan|1"), so it survives
  * collections; its fingerprint is a hash of its value (e.g. the fan's status, flags and whether it turns), so an
@@ -12,6 +13,8 @@
 if (!defined('ST_ACK_FILE')) define('ST_ACK_FILE', getenv('ST_ACK_FILE') ?: '/boot/config/plugins/storage-topology/acks.json');
 const ST_ACK_SPACES = ['storage', 'network'];
 const ST_ACK_MAX = 500;               // per page; the oldest acknowledgements are dropped beyond this
+if (!defined('ST_LAYOUT_FILE')) define('ST_LAYOUT_FILE', getenv('ST_LAYOUT_FILE') ?: '/boot/config/plugins/storage-topology/layouts.json');
+const ST_LAYOUT_MAX = 64;
 
 function st_problem_id(string $level, string $key): string { return substr(sha1("$level|$key"), 0, 16); }
 function st_problem_fp(string $value): string { return substr(sha1($value), 0, 12); }
@@ -38,27 +41,53 @@ function st_acks_apply(array &$m, string $space, string $file = ST_ACK_FILE): vo
   foreach (['crit', 'warn', 'info'] as $l) if (in_array($l, array_column($active, 'level'), true)) { $m['level'] = $l; break; }
 }
 
-// Add ($entry = [fp, text]) or remove ($entry = null) one acknowledgement. Locked, written to a temp file and renamed.
-function st_acks_write(string $space, string $id, ?array $entry, string $file = ST_ACK_FILE): bool {
-  if (!in_array($space, ST_ACK_SPACES, true) || !preg_match('/^[0-9a-f]{16}$/', $id)) return false;
+// Change one JSON file on the flash drive: $change gets its contents and returns the new ones. Locked, written to a
+// temp file and renamed.
+function st_json_update(string $file, string $lockName, callable $change): bool {
   $dir = dirname($file);
   if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return false;
-  $lock = @fopen('/var/run/storage-topology-acks.lock', 'c') ?: @fopen("$file.lock", 'c');
+  $lock = @fopen("/var/run/$lockName.lock", 'c') ?: @fopen("$file.lock", 'c');
   if (!$lock || !flock($lock, LOCK_EX)) return false;
-  $all = st_acks_read($file);
-  $acks = $all[$space] ?? [];
-  if ($entry === null) unset($acks[$id]);
-  else {
-    $acks[$id] = ['fp' => (string)$entry['fp'], 'text' => mb_substr((string)($entry['text'] ?? ''), 0, 300), 'at' => time()];
-    if (count($acks) > ST_ACK_MAX) { uasort($acks, fn($a, $b) => ($b['at'] ?? 0) <=> ($a['at'] ?? 0)); $acks = array_slice($acks, 0, ST_ACK_MAX, true); }
-  }
-  $all[$space] = $acks;
+  $all = $change(st_acks_read($file));
   $tmp = "$file.tmp." . getmypid();
   $ok = @file_put_contents($tmp, json_encode($all, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_FORCE_OBJECT) . "\n") !== false && @rename($tmp, $file);
   if (!$ok) @unlink($tmp);
   flock($lock, LOCK_UN);
   fclose($lock);
   return $ok;
+}
+
+// Add ($entry = [fp, text]) or remove ($entry = null) one acknowledgement.
+function st_acks_write(string $space, string $id, ?array $entry, string $file = ST_ACK_FILE): bool {
+  if (!in_array($space, ST_ACK_SPACES, true) || !preg_match('/^[0-9a-f]{16}$/', $id)) return false;
+  return st_json_update($file, 'storage-topology-acks', function (array $all) use ($space, $id, $entry) {
+    $acks = $all[$space] ?? [];
+    if ($entry === null) unset($acks[$id]);
+    else {
+      $acks[$id] = ['fp' => (string)$entry['fp'], 'text' => mb_substr((string)($entry['text'] ?? ''), 0, 300), 'at' => time()];
+      if (count($acks) > ST_ACK_MAX) { uasort($acks, fn($a, $b) => ($b['at'] ?? 0) <=> ($a['at'] ?? 0)); $acks = array_slice($acks, 0, ST_ACK_MAX, true); }
+    }
+    $all[$space] = $acks;
+    return $all;
+  });
+}
+
+// Bay layouts picked on the storage page, per shelf (its key: enclosure WWN, or SES device): a TOPO_LAYOUTS key or
+// "grid" (SES order). A shelf that is not listed uses the layout found for it (topo_layouts).
+function st_layouts_read(string $file = ST_LAYOUT_FILE): array {
+  return array_filter(st_acks_read($file), fn($v, $k) => is_string($v) && st_layout_valid((string)$k, $v), ARRAY_FILTER_USE_BOTH);
+}
+function st_layout_valid(string $shelf, string $layout): bool {
+  return (bool)preg_match('/^[0-9A-Za-z]{1,40}$/', $shelf) && (bool)preg_match('/^[a-z0-9-]{1,16}$/', $layout);
+}
+// Set ($layout) or clear ($layout = null: back to the detected one) a shelf's layout. At most ST_LAYOUT_MAX shelves.
+function st_layout_write(string $shelf, ?string $layout, string $file = ST_LAYOUT_FILE): bool {
+  if (!st_layout_valid($shelf, $layout ?? 'grid')) return false;
+  return st_json_update($file, 'storage-topology-layouts', function (array $all) use ($shelf, $layout) {
+    unset($all[$shelf]);
+    if ($layout !== null) $all[$shelf] = $layout;
+    return array_slice($all, -ST_LAYOUT_MAX, null, true);
+  });
 }
 
 // The problems list with its controls. $m has gone through st_acks_apply.
@@ -111,6 +140,34 @@ document.addEventListener('click', function (e) {
     .then(function (j) {
       if (!(j && j.ok)) return failed((j && j.error) || 'unknown error');
       // Reload without ?refresh=1: an acknowledgement needs no new collection (storcli/sg_ses), the 60 s cache will do.
+      var u = new URL(location.href); u.searchParams.delete('refresh'); location.replace(u.toString());
+    })
+    .catch(function (err) { failed(String(err)); });
+});
+</script>
+JS;
+}
+
+// Script for the storage page's bay layout pickers: POST the shelf's choice to include/layout.php (URL-encoded, with
+// csrf_token, as the Acknowledge links do), then reload. A failure is shown next to the picker.
+function st_layout_js(string $csrf): string {
+  $tok = json_encode($csrf, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+  return <<<JS
+<script>
+document.addEventListener('change', function (e) {
+  var s = e.target;
+  if (!s.matches || !s.matches('select.st-layout')) return;
+  var body = new URLSearchParams();
+  body.append('csrf_token', typeof csrf_token !== 'undefined' ? csrf_token : $tok);
+  body.append('shelf', s.dataset.shelf || '');
+  body.append('layout', s.value);
+  var msg = s.parentNode.querySelector('.st-layout-msg');
+  s.disabled = true;
+  var failed = function (why) { s.disabled = false; if (msg) { msg.className = 'st-layout-msg st-warn'; msg.textContent = 'Could not save: ' + why; } };
+  fetch('/plugins/storage-topology/include/layout.php', {method: 'POST', body: body, credentials: 'same-origin'})
+    .then(function (r) { return r.json().catch(function () { return {error: 'HTTP ' + r.status}; }); })
+    .then(function (j) {
+      if (!(j && j.ok)) return failed((j && j.error) || 'unknown error');
       var u = new URL(location.href); u.searchParams.delete('refresh'); location.replace(u.toString());
     })
     .catch(function (err) { failed(String(err)); });

@@ -1,0 +1,2 @@
+host0|mpt3sas
+host1|ahci
