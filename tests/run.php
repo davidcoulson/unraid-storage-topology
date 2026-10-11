@@ -585,14 +585,38 @@ file_put_contents("$d4/storcli.path", "/usr/sbin/storcli64\n");
 file_put_contents("$d4/lsscsi.txt", "[0:0:0:0]    enclosu LSI      VirtualSES       03    -          /dev/sg9 \n" . file_get_contents("$d4/lsscsi.txt"));
 file_put_contents("$d4/ses_sg9.json", ses_json_slots(48));
 $m4 = load($d4);
-t(!array_filter($m4['problems'], fn($p) => $p['level'] === 'warn') && count(matching($m4, "/^storcli could not read enclosures or drives \\(Failed to get enclosure information\\); bays and drives are shown from SES and the kernel's view\\.$/", 'info')) === 1,
+t(!array_filter($m4['problems'], fn($p) => $p['level'] === 'warn') && count(matching($m4, "/^storcli could not read enclosures or drives on c0 \\(Failed to get enclosure information\\); its bays and drives are shown from SES and the kernel's view\\.$/", 'info')) === 1,
   'storcli declining is one note: ' . dump_problems($m4));
+// An unexpected failure on that controller, or a failure on another controller without a kernel view, stays a warning.
+file_put_contents("$d4/drives.json", json_encode(['Controllers' => [
+  ['Command Status' => ['Controller' => 0, 'Status' => 'Failure', 'Description' => 'Controller is busy']],
+  ['Command Status' => ['Controller' => 1, 'Status' => 'Failure', 'Description' => 'Failed to get enclosure information']]]]));
+$m4 = load($d4);
+t(count(matching($m4, '/^storcli could not read enclosures or drives on c0 \(Failed to get enclosure information; Controller is busy\)\.$/', 'warn')) === 1
+  && count(matching($m4, '/^storcli could not read drives on c1 \(Failed to get enclosure information\)\.$/', 'warn')) === 1, 'unknown failures and uncovered controllers stay warnings: ' . dump_problems($m4));
+file_put_contents("$d4/drives.json", '{"Controllers":[{"Command Status":{"Controller":0,"Status":"Weird"}}]}');
+t(count(matching(load($d4), '/^Collection: drives\.json: exit 255/', 'warn')) === 1, 'a response that is neither Success nor Failure is still a collection error');
+file_put_contents("$d4/drives.json", '{"Controllers":[{"Command Status":{"Controller":0,"Status":"Success"}},{"Response Data":{}}]}');
+t(count(matching(load($d4), '/^Collection: drives\.json: exit 255/', 'warn')) === 1, 'a controller entry without a command status keeps the collection error');
+file_put_contents("$d4/drives_noencl.json", json_encode(['Controllers' => [['Command Status' => ['Controller' => 0, 'Status' => 'Failure', 'Description' => 'No drive found!']],
+  ['Command Status' => ['Controller' => 1, 'Status' => 'Failure', 'Description' => 'Controller is busy']]]]));
+$m4 = load($d4);
+t(count(matching($m4, '/^storcli could not read drives on c1 \(Controller is busy\)\.$/', 'warn')) === 1 && !matching($m4, '/No drive found/'),
+  '"No drive found" on one controller does not hide another controller\'s failure: ' . dump_problems($m4));
+file_put_contents("$d4/drives_noencl.json", '{"Controllers":[{"Command Status":{"Controller":0,"Status":"Failure","Description":"No drive found!"}},{"Response Data":{}}]}');
+t(count(matching(load($d4), '/^Collection: drives_noencl\.json: exit 255/', 'warn')) === 1, '... nor a malformed entry');
+file_put_contents("$d4/drives_noencl.json", '{"Controllers":[]}');
+file_put_contents("$d4/drives_noencl.json.err", "No drive found!\n");
+t(count(matching(load($d4), '/^Collection: drives_noencl\.json: exit 255/', 'warn')) === 1, '... nor an empty Controllers list with "No drive found" on stderr');
+file_put_contents("$d4/drives_noencl.json", "No drive found!\n");
+t(!matching(load($d4), '/drives_noencl/'), 'plain-text "No drive found" (not JSON) is still no error');
+unlink("$d4/drives_noencl.json.err");
 t(!$m4['other_ses'] && count($m4['shelves']) === 2 && !$m4['enclosures'], 'the HBA\'s VirtualSES is not shown as an enclosure');
 $d5 = "$tmp/storcli-declined-megaraid";
 copy_dir("$fx/storcli-direct", $d5);
 file_put_contents("$d5/drives.json", $fail);
 file_put_contents("$d5/timings", str_replace('drives.json|0|', 'drives.json|255|', file_get_contents("$d5/timings")));
-t(count(matching(load($d5), '/^storcli could not read drives \(Failed to get enclosure information\)\.$/', 'warn')) === 1, 'without a kernel view of the controller it stays a warning');
+t(count(matching(load($d5), '/^storcli could not read drives on c0 \(Failed to get enclosure information\)\.$/', 'warn')) === 1, 'without a kernel view of the controller it stays a warning');
 
 // The layout picked on the page, per shelf.
 t(st_layouts_read() === [] && st_layout_write('5003048001F0A03E', 'sm-216') && st_layout_write('5003048001F0B03E', 'grid'), 'layouts written');

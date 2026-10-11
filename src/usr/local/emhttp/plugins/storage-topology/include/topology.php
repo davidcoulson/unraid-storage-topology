@@ -125,14 +125,22 @@ function topo_load(string $dir = TOPO_CACHE): array {
     if (preg_match('/^ses_(sg\d+)\.json$/', $name, $mm) && ($m['timings']["sesstat_{$mm[1]}.json"]['rc'] ?? -1) === 0) continue;
     // Optional pages: configuration (names, subenclosure revisions), element descriptors and additional element status.
     if (preg_match('/^ses(cfg|desc|aes)_/', $name)) continue;
-    if ($name === 'drives_noencl.json' && stripos($err . @file_get_contents("$dir/$name"), 'No drive found') !== false) continue;
-    // storcli ran and answered, but declined ("Failed to get enclosure information" from some IT-mode HBAs): a note
-    // when the kernel's view covers the controller (topo_problems), not a failed collection.
-    $st = (topo_json("$dir/$name")['Controllers'][0]['Command Status'] ?? null);
-    if (preg_match('/^(encl|drives|drives_noencl)\.json$/', $name) && ($st['Status'] ?? '') === 'Failure') {
-      $m['storcli_failed'][$name] = trim((string)($st['Description'] ?? '')) ?: 'Failure';
+    // storcli ran and answered for every controller, but declined some (e.g. "Failed to get enclosure information"
+    // from IT-mode HBAs): judged per controller in topo_problems, not a failed collection.
+    $sj = topo_json("$dir/$name");
+    $ctrls = $sj['Controllers'] ?? null;
+    $cs = is_array($ctrls) ? array_map(fn($x) => is_array($x['Command Status'] ?? null) ? $x['Command Status'] : [], $ctrls) : [];
+    if (preg_match('/^(encl|drives|drives_noencl)\.json$/', $name) && $cs && !array_filter($cs, fn($c) => !in_array($c['Status'] ?? '', ['Success', 'Failure'], true))) {
+      foreach ($cs as $c) {
+        $desc = trim((string)($c['Description'] ?? ''));
+        // A controller without drives outside an enclosure answers "No drive found!" to the noencl query: nothing to note.
+        if ($c['Status'] !== 'Failure' || ($name === 'drives_noencl.json' && stripos($desc, 'No drive found') !== false)) continue;
+        $m['storcli_failed'][] = ['file' => $name, 'ctrl' => is_numeric($c['Controller'] ?? null) ? (int)$c['Controller'] : null, 'desc' => $desc ?: 'Failure'];
+      }
       continue;
     }
+    // (Output that is not storcli JSON at all: "No drive found" on stderr.)
+    if ($name === 'drives_noencl.json' && $sj === null && stripos($err . @file_get_contents("$dir/$name"), 'No drive found') !== false) continue;
     $m['errors'][] = "$name: " . ((int)$rc === 124 ? 'timed out' : "exit $rc") . ($err ? " - $err" : '');
   }
   if (is_file("$dir/drives.skipped")) $m['detail'] = false;
@@ -1221,12 +1229,20 @@ function topo_problems(array &$m): void {
   foreach ($m['errors'] as $e) $add('warn', "Collection: $e");
   if (!empty($m['storcli_none']) && array_filter($m['controllers'], fn($c) => !empty($c['sysfs'])))
     $add('info', 'storcli is installed but supports none of these controllers (it covers SAS3 cards and newer; SAS2 cards such as the 9207/9211/9217 are not), so they are shown from the kernel\'s view.', 'storcli|none', '');
-  if ($m['storcli_failed']) {
-    $kernel = (bool)array_filter($m['controllers'], fn($c) => !empty($c['sysfs']) || !empty($c['kernel_ports']));
-    $what = implode(' or ', array_unique(array_map(fn($n) => $n === 'encl.json' ? 'enclosures' : 'drives', array_keys($m['storcli_failed']))));
-    $add($kernel ? 'info' : 'warn', "storcli could not read $what (" . implode('; ', array_unique($m['storcli_failed'])) . ')'
-      . ($kernel ? '; bays and drives are shown from SES and the kernel\'s view.' : '.'),
-      'storcli|failed', implode(',', array_keys($m['storcli_failed'])));
+  // storcli declining a controller: a note when it is a known "not supported here" answer and the kernel's view of that
+  // controller covers its ports, bays and drives; else a warning.
+  $byCtrl = [];
+  foreach ($m['storcli_failed'] as $f) $byCtrl[$f['ctrl'] ?? -1][] = $f;
+  foreach ($byCtrl as $cid => $fs) {
+    $c = null;
+    foreach ($m['controllers'] as $x) if ($x['id'] === $cid) $c = $x;
+    $known = !array_filter($fs, fn($f) => !preg_match('/failed to get enclosure information|not supported|unsupported/i', $f['desc']));
+    $covered = $known && $c && (!empty($c['sysfs']) || !empty($c['kernel_ports']));
+    $what = implode(' or ', array_unique(array_map(fn($f) => $f['file'] === 'encl.json' ? 'enclosures' : 'drives', $fs)));
+    $on = $cid >= 0 ? " on c$cid" : '';
+    $add($covered ? 'info' : 'warn', "storcli could not read $what$on (" . implode('; ', array_unique(array_column($fs, 'desc'))) . ')'
+      . ($covered ? '; its bays and drives are shown from SES and the kernel\'s view.' : '.'),
+      "storcli|failed|$cid", implode(',', array_map(fn($f) => "{$f['file']}:{$f['desc']}", $fs)));
   }
   if ($m['storcli'] === '' && $m['megaraid'])
     $add('info', 'A MegaRAID controller is present but storcli is not installed, so controller, port and per-drive detail is missing.');

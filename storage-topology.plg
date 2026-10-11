@@ -3,7 +3,7 @@
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
 <!ENTITY version    "2026.10.19">
-<!ENTITY md5        "4ae391b85ff4bbe69b923ba10eb64f4b">
+<!ENTITY md5        "04405c9bfa0c84a86415e5eab3903ed6">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
