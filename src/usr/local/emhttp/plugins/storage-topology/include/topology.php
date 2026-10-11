@@ -1232,8 +1232,14 @@ function topo_problems(array &$m): void {
   foreach ($m['enclosures'] as $e) if (in_array($e['level'], ['info', 'warn', 'crit'], true))
     $add($e['level'], ($e['usb'] ? 'USB enclosure' : 'Enclosure') . " {$e['name']} ({$e['sg']}): status {$e['status_text']}", "encl|{$e['name']}|{$e['hctl']}", $e['status_text']);
 
-  $slow = []; $other = 0; $otherDrives = 0;
-  foreach ($m['drives'] as $d) {
+  // Where each drive is, for the slow-link note: its shelf bay, or where a drive in no bay is attached.
+  $bayOf = [];
+  foreach ($m['shelves'] as $key => $s) foreach ($m['drives'] as $id => $d)
+    if (!empty($d['placed']) && ($s['eid'] !== null ? ($d['eid'] === $s['eid'] && $d['ctrl'] === $s['ctrl']) : (($d['shelf'] ?? null) === $key)))
+      $bayOf[$id] = "{$s['label']} bay {$d['slot']}";
+  foreach ($m['direct'] as $x) if (($x['where'] ?? '') !== '') $bayOf[$x['drive']] ??= $x['where'];
+  $slow = []; $slowText = []; $other = 0; $otherDrives = 0;
+  foreach ($m['drives'] as $id => $d) {
     $who = $d['unraid'] ?: ($d['dev'] ?: ($d['eid'] !== null ? "e{$d['eid']}/s{$d['slot']}" : "s{$d['slot']}"));
     $dk = 'drive|' . ($d['serial'] ?: $who);
     if ($d['state'] && !in_array($d['state'], ['Onln', 'JBOD', 'UGood'], true)) $add('crit', "Drive $who state {$d['state']}", "$dk|state", $d['state']);
@@ -1242,10 +1248,24 @@ function topo_problems(array &$m): void {
     if ((int)$d['media_err'] > 0) $add('warn', "Drive $who: {$d['media_err']} media errors", "$dk|media", $d['media_err']);
     if ((int)$d['other_err'] > 0) { $other += (int)$d['other_err']; $otherDrives++; }
     if ($d['multipath'] && count(array_filter($d['paths'], fn($x) => $x['status'] === 'Active')) < 2) $add('warn', "Drive $who: only one path active", "$dk|paths", '');
-    if ($d['max_rate'] && $d['rate'] && $d['rate'] < $d['max_rate']) $slow[] = $who;
+    if ($d['max_rate'] && $d['rate'] && $d['rate'] < $d['max_rate']) {
+      $slow[] = $who;
+      $slowText[$who] = "$who " . topo_rate_text($d['rate']) . ' of ' . topo_rate_text($d['max_rate']) . ' Gb/s' . (isset($bayOf[$id]) ? " ({$bayOf[$id]})" : '');
+    }
   }
+  // Without storcli the maximum is only known for SATA drives (6 Gb/s), so these are mostly SATA drives at 3 Gb/s.
+  // In a shelf each drive has its own link to the expander, so a cable fault would slow the whole shelf, not single
+  // drives. The value stays the list of drives, as before: an acknowledgement lapses when the list changes.
   sort($slow);
-  if ($slow) $add('info', count($slow) . ' drives link below their maximum rate (' . count($m['drives']) . ' total), e.g. 6 Gb/s on 12 Gb/s drives.', 'drives|slow', implode(',', $slow));
+  if ($slow) {
+    ksort($slowText, SORT_NATURAL);
+    $shown = array_slice($slowText, 0, 5);
+    $n = count($slow);
+    $add('info', "$n of " . count($m['drives']) . ' drives ' . ($n === 1 ? 'links' : 'link') . ' below ' . ($n === 1 ? 'its' : 'their') . ' maximum rate: '
+      . implode(', ', $shown) . ($n > count($shown) ? ' and ' . ($n - count($shown)) . ' more' : '')
+      . '. Reseat the drive or swap bays to see whether the slow rate follows the drive or the bay, and check its PHY error counters (smartctl -x); for hard drives it is harmless while those stay flat.',
+      'drives|slow', implode(',', $slow));
+  }
   if ($otherDrives) $add('info', "$otherDrives drives have 'other' errors ($other in total) - usually link resets; watch for growth.", 'drives|other', $other);
 
   foreach ($m['other_ses'] as $o) {

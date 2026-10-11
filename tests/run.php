@@ -489,6 +489,37 @@ $a = st_anon_text($st2, 'x', "aa:bb:cc:11:22:33 AA:BB:CC:11:22:33 00:00:00:00:00
 t($a === 'aa:bb:cc:00:00:01 AA:BB:CC:00:00:01 00:00:00:00:00:00 tower host1.local 0x5000c50000011224 5000C50000011225', 'MACs, hostnames and SAS addresses map consistently (default name "tower" kept): ' . $a);
 
 // ---------------------------------------------------------------------------------------------------------
+$section = 'slow-links';
+// Drives below their maximum rate are named with their rates and where they are, not a fixed example.
+t(!matching($m = load("$fx/netapp-single-path"), '/maximum rate/'), 'no slow-link note while every drive links at its maximum');
+$d2 = "$tmp/slow-shelf";
+copy_dir("$fx/netapp-single-path", $d2);
+file_put_contents("$d2/expander_phys.txt", preg_replace('/^(phy-0:0:8)\|6\.0 Gbit/m', '$1|3.0 Gbit', file_get_contents("$d2/expander_phys.txt")));
+$m = load($d2);
+$slow = matching($m, '/maximum rate/', 'info');
+t(count($slow) === 1 && $slow[0]['key'] === 'drives|slow' && str_starts_with($slow[0]['text'],
+  '1 of 2 drives links below its maximum rate: disk1 3 of 6 Gb/s (Shelf 01 bay 0). Reseat the drive or swap bays'),
+  'one SATA drive at 3 of 6 Gb/s, named with its shelf bay: ' . dump_problems($m));
+t(str_contains($slow[0]['text'] ?? '', 'smartctl -x') && !str_contains($slow[0]['text'] ?? '', 'e.g.'), 'hint names the PHY error counters; no fixed example rates');
+// Acknowledged, it stays acknowledged while the same drives are slow; another slow drive makes it show again.
+t(st_acks_write('storage', $slow[0]['id'], ['fp' => $slow[0]['fp'], 'text' => $slow[0]['text']]), 'ack written');
+t(!matching(load($d2), '/maximum rate/'), 'acknowledged slow-link note leaves the list');
+file_put_contents("$d2/expander_phys.txt", preg_replace('/^(phy-0:0:9)\|6\.0 Gbit/m', '$1|3.0 Gbit', file_get_contents("$d2/expander_phys.txt")));
+$m = load($d2);
+$slow2 = matching($m, '/maximum rate/', 'info');
+t(count($slow2) === 1 && $slow2[0]['id'] === $slow[0]['id'] && $slow2[0]['stale'] && str_starts_with($slow2[0]['text'], '2 of 2 drives link below their maximum rate: disk1 3 of 6 Gb/s')
+  && str_contains($slow2[0]['text'], ', disk2 3 of 6 Gb/s (Shelf 01 bay 1)'), 'a second slow drive: same id, the acknowledgement lapses: ' . dump_problems($m));
+st_acks_write('storage', $slow[0]['id'], null);
+// Drives straight on the HBA are named with their port; more than five are cut short.
+$d3 = "$tmp/slow-direct";
+copy_dir("$fx/it-mode-sas3224", $d3);
+file_put_contents("$d3/sas_phys.txt", preg_replace('/^(phy-0:[0-389])\|6\.0 Gbit/m', '$1|3.0 Gbit', file_get_contents("$d3/sas_phys.txt")));
+$m = load($d3);
+$slow = matching($m, '/maximum rate/', 'info');
+t(count($slow) === 1 && str_starts_with($slow[0]['text'], '6 of 19 drives link below their maximum rate: cache 3 of 6 Gb/s (HBA c0 port 0), cache2 3 of 6 Gb/s (HBA c0 port 1), ')
+  && str_contains($slow[0]['text'], ' and 1 more. Reseat') && substr_count($slow[0]['text'], ' of 6 Gb/s') === 5, 'six SSDs on HBA ports: five named, "and 1 more": ' . dump_problems($m));
+
+// ---------------------------------------------------------------------------------------------------------
 $section = 'ack-js';
 // The webGUI never answers multipart/form-data POSTs: the Acknowledge script must send URL-encoded form data, with
 // csrf_token in the body, and report failures next to the link rather than with alert().
