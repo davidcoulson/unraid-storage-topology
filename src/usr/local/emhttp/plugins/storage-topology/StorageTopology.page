@@ -291,7 +291,8 @@ $opt = fn($v, $text) => "<option value='{$h($v)}'" . (($chosen ?? 'auto') === $v
 <?if ($lay):?>
 <p class="st-dim" style="margin:2px 0"><?=$chosen === null && $s['layout_why'] ? 'Identified from the ' . $h($s['layout_why']) . '. ' : 'Layout picked on this page. '?>
 Bay numbers as printed by Supermicro: <?=$lay['order'] === 'up' ? "bay {$lay['first']} at the bottom left, counting up each column, then the next column to the right"
-  : "bay {$lay['first']} at the left, counting to the right"?>.<?=count($g['slot']) !== $lay['bays'] ? ' This shelf reports ' . count($g['slot']) . " SES bays, the layout has {$lay['bays']}." : ''?></p>
+  : "bay {$lay['first']} at the left, counting to the right"?>.<?=count($g['slot']) !== $lay['bays'] ? ' This shelf reports ' . count($g['slot']) . " SES bays, the layout has {$lay['bays']}"
+  . (count($g['slot']) > $lay['bays'] ? "; bay {$lay['first']} is SES slot {$lay['base']} (check with a bay's locate LED)" : '') . '.' : ''?></p>
 <div class="st-front-wrap"><div class="st-bays st-front<?=$narrow ? ' st-narrow' : ''?>" style="--cols:<?=$lay['cols']?>">
 <?$taken = [];
 foreach ($g['slot'] as $x) if (isset($pos[$x['slot']])) {

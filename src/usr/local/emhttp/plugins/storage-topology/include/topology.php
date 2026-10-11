@@ -869,11 +869,14 @@ function topo_kernel_drive(array $n, string $blk, ?array $end, array $k): array 
  * enclosure ID or expander SAS address (or SMC/Supermicro in its SES inquiry data), then by its number of bays.
  * Sets layout_auto (a TOPO_LAYOUTS key, or null for the plain grid) and layout_why. */
 function topo_layouts(array &$m): void {
-  foreach ($m['shelves'] as $key => &$s) {
-    $addrs = array_merge([$s['wwn']], array_keys(array_filter($m['addr_shelf'], fn($v) => $v === $key)));
+  foreach ($m['shelves'] as &$s) {
+    // (By $s['key']: PHP turns an all-digit WWN array key into an int.)
+    $addrs = array_merge([$s['wwn']], array_map('strval', array_keys(array_filter($m['addr_shelf'], fn($v) => (string)$v === (string)$s['key']))));
     $oui = (bool)array_filter($addrs, fn($a) => str_starts_with(strtoupper((string)$a), TOPO_OUI_SUPERMICRO));
     $vendor = (bool)preg_match('/^(SMC|SUPERMICRO|SUPERMCR)\b/i', trim($s['vendor']));
+    // Slots with status Unsupported only count when the full count matches no chassis (a virtual slot 0 before bays 1-24).
     $bays = count($s['groups']['slot']);
+    if (!isset(TOPO_SM_BY_BAYS[$bays])) $bays = count(array_filter($s['groups']['slot'], fn($x) => ($x['status'] ?? '') !== 'Unsupported'));
     $s['layout_auto'] = null; $s['layout_why'] = '';
     if (!$oui && !$vendor) continue;
     $why = ($oui ? 'Supermicro SAS address (OUI 00:30:48)' : "SES vendor {$s['vendor']}") . ", {$s['vendor']} {$s['product']} expander, $bays bays";
@@ -894,8 +897,13 @@ function topo_bay_map(array $s, ?string $id): array {
     foreach (array_values($slots) as $i => $sl) $pos[$sl] = ['label' => (string)$sl, 'row' => intdiv($i, 6) + 1, 'col' => $i % 6 + 1];
     return [null, $pos, []];
   }
-  $nums = array_filter($slots, 'is_int');
-  $base = $nums ? min($nums) : 0;                    // SES bays count from 0 or 1
+  // SES bays count from 0 or 1: take the start that puts the most of them on the layout, so that an extra slot outside
+  // it does not shift the others. Slots with status Unsupported (no bay behind them, e.g. a virtual slot 0 before
+  // bays 1-24) do not count. A tie left after that (25 slots for 24 bays) counts from 0, and the page says so.
+  $nums = [];
+  foreach ($s['groups']['slot'] as $x) if (is_int($x['slot']) && ($x['status'] ?? '') !== 'Unsupported') $nums[] = $x['slot'];
+  $on = fn(int $b) => count(array_filter($nums, fn($n) => $n >= $b && $n < $b + $lay['bays']));
+  $base = $on(1) > $on(0) ? 1 : 0;
   foreach ($slots as $sl) {
     $i = is_int($sl) ? $sl - $base : -1;
     if ($i < 0 || $i >= $lay['bays']) { $extra[] = $sl; continue; }
@@ -903,7 +911,7 @@ function topo_bay_map(array $s, ?string $id): array {
                                           : [intdiv($i, $lay['cols']) + 1, $i % $lay['cols'] + 1];
     $pos[$sl] = ['label' => (string)($i + $lay['first']), 'row' => $row, 'col' => $col];
   }
-  return [$lay + ['id' => $id], $pos, $extra];
+  return [$lay + ['id' => $id, 'base' => $base], $pos, $extra];
 }
 
 // Attach drives to their shelf: storcli drives by controller + enclosure ID, kernel-view drives by enclosure WWN.

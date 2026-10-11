@@ -507,13 +507,20 @@ t($at(0) === '0@6,1' && $at(5) === '5@1,1' && $at(6) === '6@6,2' && $at(18) === 
 [$lay, $pos] = topo_bay_map($s836, 'sm-836');
 t($at(0) === '0@4,1' && $at(3) === '3@1,1' && $at(4) === '4@4,2' && $at(15) === '15@1,4', '836: 4 x 4, bay 0 bottom left: ' . implode(' ', array_map($at, [0, 3, 4, 15])));
 // SC826 bays are printed 1-12; SES may count its bays from 0 or 1.
-$fake = fn(array $slots) => ['groups' => ['slot' => array_map(fn($n) => ['slot' => $n], $slots)]];
+$fake = fn(array $slots) => ['groups' => ['slot' => array_map(fn($n) => ['slot' => $n, 'status' => 'OK'], $slots)]];
 [, $pos] = topo_bay_map($fake(range(0, 11)), 'sm-826');
 $a0 = [$at(0), $at(11)];
 [, $pos] = topo_bay_map($fake(range(1, 12)), 'sm-826');
 t($a0 === ['1@3,1', '12@1,4'] && [$at(1), $at(12)] === ['1@3,1', '12@1,4'], '826: printed 1-12 from the bottom left, whether SES counts from 0 or 1');
-[, $pos, $extra] = topo_bay_map($fake(range(0, 25)), 'sm-846');
-t(count($pos) === 24 && $extra === [24, 25], 'SES bays beyond the layout are listed apart');
+[$lay, $pos, $extra] = topo_bay_map($fake(range(0, 25)), 'sm-846');
+t(count($pos) === 24 && $extra === [24, 25] && $lay['base'] === 0, 'SES bays beyond the layout are listed apart');
+$aux = $fake(range(0, 24)); $aux['groups']['slot'][0]['status'] = 'Unsupported';
+[$lay, $pos, $extra] = topo_bay_map($aux, 'sm-846');
+t($lay['base'] === 1 && $extra === [0] && $at(1) === '0@6,1' && $at(24) === '23@1,4', 'a virtual slot 0 (Unsupported) before slots 1-24 does not shift them: ' . $at(1) . ' ' . $at(24));
+[$lay, $pos, $extra] = topo_bay_map($fake(range(1, 24)), 'sm-846');
+t($lay['base'] === 1 && !$extra && $at(1) === '0@6,1', 'slots 1-24: bay 0 is SES slot 1');
+[$lay, $pos, $extra] = topo_bay_map($fake(range(0, 24)), 'sm-846');
+t($lay['base'] === 0 && $extra === [24] && $at(0) === '0@6,1', 'a tie (25 slots for 24 bays) counts from SES slot 0');
 [, $pos] = topo_bay_map($s846, 'sm-216');
 t($at(0) === '0@1,1' && $at(23) === '23@1,24', 'SC216: one row, left to right');
 [$lay, $pos] = topo_bay_map($s846, null);
@@ -538,6 +545,28 @@ $m2 = load($d2);
 $auto = array_column($m2['shelves'], 'layout_auto', 'label');
 t(($auto['Shelf sg30'] ?? '') === 'sm-846' && array_key_exists('Shelf sg31', $auto) && $auto['Shelf sg31'] === null && str_starts_with($m2['shelves'][array_key_first($m2['shelves'])]['layout_why'], 'SES vendor SMC'),
   'SES vendor SMC identifies a Supermicro backplane without the OUI: ' . json_encode($auto));
+// A virtual slot 0 (status Unsupported) before bays 1-24: still an SC846, and slot 1 is bay 0.
+$d3 = "$tmp/sm-virtual-slot";
+copy_dir($dir, $d3);
+$j = json_decode(file_get_contents("$d3/ses_sg30.json"), true);
+$els = &$j['join_of_diagnostic_pages']['element_list'];
+foreach ($els as &$e) if (!empty($e['individual']) && $e['element_type']['i'] === 23) {
+  $e['element_number']++;
+  $e['additional_element_status_descriptor']['device_slot_number']++;
+}
+unset($e);
+array_splice($els, 1, 0, [['element_type' => ['i' => 23, 'meaning' => 'Array device slot'], 'descriptor' => '', 'element_number' => 0, 'overall' => 0, 'individual' => true,
+  'status_descriptor' => ['status' => ['i' => 0, 'meaning' => 'Unsupported']], 'additional_element_status_descriptor' => ['device_slot_number' => 0, 'phy_descriptor_list' => []]]]);
+unset($els);
+file_put_contents("$d3/ses_sg30.json", json_encode($j));
+file_put_contents("$d3/enclosure_sysfs.txt", preg_replace_callback('/^([^|]*\|0x5003048001f0a03e\|Slot)(\d+)\|(\d+)\|/m',
+  fn($mm) => $mm[1] . sprintf('%02d', $mm[2] + 1) . '|' . ($mm[3] + 1) . '|', file_get_contents("$d3/enclosure_sysfs.txt")));
+$m3 = load($d3);
+$s3 = $m3['shelves']['5003048001F0A03E'] ?? null;
+[$lay, $pos, $extra] = $s3 ? topo_bay_map($s3, $s3['layout_auto']) : [null, [], []];
+t($s3 && count($s3['groups']['slot']) === 25 && $s3['layout_auto'] === 'sm-846' && $lay['base'] === 1 && $extra === [0] && $at(1) === '0@6,1'
+  && ($s3['drives'][1]['unraid'] ?? '') === 'parity', 'virtual slot 0 + bays 1-24: SC846, SES slot 1 (parity) is bay 0: ' . json_encode([$s3['layout_auto'] ?? null, $extra, $at(1)]));
+
 // The layout picked on the page, per shelf.
 t(st_layouts_read() === [] && st_layout_write('5003048001F0A03E', 'sm-216') && st_layout_write('5003048001F0B03E', 'grid'), 'layouts written');
 t(st_layouts_read() === ['5003048001F0A03E' => 'sm-216', '5003048001F0B03E' => 'grid'], 'and read back: ' . json_encode(st_layouts_read()));
