@@ -109,7 +109,7 @@ function topo_short_status(int $b): array {
 function topo_load(string $dir = TOPO_CACHE): array {
   $m = ['collected' => (int)@file_get_contents("$dir/done"), 'timings' => [], 'errors' => [], 'controllers' => [], 'sg_by_hctl' => [],
         'shelves' => [], 'other_ses' => [], 'enclosures' => [], 'drives' => [], 'direct' => [], 'cables' => [], 'problems' => [],
-        'detail' => true, 'storcli' => '', 'megaraid' => false, 'scsi_hosts' => [], 'lsscsi' => [], 'addr_shelf' => [], 'hphy_port' => [], 'no_sas' => false,
+        'detail' => true, 'storcli_failed' => [], 'storcli' => '', 'megaraid' => false, 'scsi_hosts' => [], 'lsscsi' => [], 'addr_shelf' => [], 'hphy_port' => [], 'no_sas' => false,
         'level' => 'ok'];
   if (!$m['collected']) { $m['errors'][] = 'No data collected yet.'; topo_problems($m); return $m; }
   foreach (@file("$dir/timings", FILE_IGNORE_NEW_LINES) ?: [] as $l) {
@@ -126,6 +126,13 @@ function topo_load(string $dir = TOPO_CACHE): array {
     // Optional pages: configuration (names, subenclosure revisions), element descriptors and additional element status.
     if (preg_match('/^ses(cfg|desc|aes)_/', $name)) continue;
     if ($name === 'drives_noencl.json' && stripos($err . @file_get_contents("$dir/$name"), 'No drive found') !== false) continue;
+    // storcli ran and answered, but declined ("Failed to get enclosure information" from some IT-mode HBAs): a note
+    // when the kernel's view covers the controller (topo_problems), not a failed collection.
+    $st = (topo_json("$dir/$name")['Controllers'][0]['Command Status'] ?? null);
+    if (preg_match('/^(encl|drives|drives_noencl)\.json$/', $name) && ($st['Status'] ?? '') === 'Failure') {
+      $m['storcli_failed'][$name] = trim((string)($st['Description'] ?? '')) ?: 'Failure';
+      continue;
+    }
     $m['errors'][] = "$name: " . ((int)$rc === 124 ? 'timed out' : "exit $rc") . ($err ? " - $err" : '');
   }
   if (is_file("$dir/drives.skipped")) $m['detail'] = false;
@@ -417,6 +424,8 @@ function topo_ses(string $dir, array &$m, array &$labels, array $k, array $names
   $inq = [];
   foreach ($m['lsscsi'] as $hctl => $x) {
     if ($x['type'] !== 'enclosu' || $x['sg'] === '') continue;
+    // A tri-mode HBA's own virtual enclosure (9400/9500 "VirtualSES", for directly attached drives): no shelf, no sensors.
+    if (trim($x['product']) === 'VirtualSES') continue;
     $inq[$x['sg']] = ['hctl' => $hctl, 'vendor' => $x['vendor'], 'product' => $x['product'], 'rev' => $x['rev']];
     $m['sg_by_hctl'][$hctl] = $x['sg'];
   }
@@ -1212,6 +1221,13 @@ function topo_problems(array &$m): void {
   foreach ($m['errors'] as $e) $add('warn', "Collection: $e");
   if (!empty($m['storcli_none']) && array_filter($m['controllers'], fn($c) => !empty($c['sysfs'])))
     $add('info', 'storcli is installed but supports none of these controllers (it covers SAS3 cards and newer; SAS2 cards such as the 9207/9211/9217 are not), so they are shown from the kernel\'s view.', 'storcli|none', '');
+  if ($m['storcli_failed']) {
+    $kernel = (bool)array_filter($m['controllers'], fn($c) => !empty($c['sysfs']) || !empty($c['kernel_ports']));
+    $what = implode(' or ', array_unique(array_map(fn($n) => $n === 'encl.json' ? 'enclosures' : 'drives', array_keys($m['storcli_failed']))));
+    $add($kernel ? 'info' : 'warn', "storcli could not read $what (" . implode('; ', array_unique($m['storcli_failed'])) . ')'
+      . ($kernel ? '; bays and drives are shown from SES and the kernel\'s view.' : '.'),
+      'storcli|failed', implode(',', array_keys($m['storcli_failed'])));
+  }
   if ($m['storcli'] === '' && $m['megaraid'])
     $add('info', 'A MegaRAID controller is present but storcli is not installed, so controller, port and per-drive detail is missing.');
   if (!$m['detail']) $add('info', 'Per-drive detail skipped because a disk is spun down (this page never wakes drives).');

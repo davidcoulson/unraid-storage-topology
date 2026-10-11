@@ -45,6 +45,12 @@ function rm_dir(string $d): void {
   foreach (scandir($d) ?: [] as $f) if ($f !== '.' && $f !== '..') is_dir("$d/$f") ? rm_dir("$d/$f") : unlink("$d/$f");
   @rmdir($d);
 }
+// sg_ses --json --join of an enclosure with $n empty array device slots and nothing else.
+function ses_json_slots(int $n): string {
+  $el = fn($i) => ['element_type' => ['i' => 23, 'meaning' => 'Array device slot'], 'descriptor' => '<null>', 'element_number' => $i,
+                   'overall' => $i < 0 ? 1 : 0, 'individual' => $i >= 0, 'status_descriptor' => ['status' => ['i' => $i < 0 ? 0 : 5, 'meaning' => $i < 0 ? 'Unsupported' : 'Not installed']]];
+  return json_encode(['join_of_diagnostic_pages' => ['element_list' => array_map($el, range(-1, $n - 1))]]);
+}
 function load(string $dir): array { $m = topo_load($dir); st_acks_apply($m, 'storage'); return $m; }
 function dump_problems(array $m): string { return implode("\n  ", array_map(fn($p) => "{$p['level']}: {$p['text']}", $m['problems'])); }
 
@@ -566,6 +572,27 @@ $s3 = $m3['shelves']['5003048001F0A03E'] ?? null;
 [$lay, $pos, $extra] = $s3 ? topo_bay_map($s3, $s3['layout_auto']) : [null, [], []];
 t($s3 && count($s3['groups']['slot']) === 25 && $s3['layout_auto'] === 'sm-846' && $lay['base'] === 1 && $extra === [0] && $at(1) === '0@6,1'
   && ($s3['drives'][1]['unraid'] ?? '') === 'parity', 'virtual slot 0 + bays 1-24: SC846, SES slot 1 (parity) is bay 0: ' . json_encode([$s3['layout_auto'] ?? null, $extra, $at(1)]));
+
+// storcli declining (some IT-mode HBAs: "Failed to get enclosure information", exit 66/255) is a note when the kernel's
+// view covers the controller; a tri-mode HBA's VirtualSES is no enclosure.
+$d4 = "$tmp/sm-storcli-declined";
+copy_dir($dir, $d4);
+$fail = json_encode(['Controllers' => [['Command Status' => ['CLI Version' => '007.3404.0000.0000', 'Controller' => 0, 'Status' => 'Failure',
+  'Description' => 'Failed to get enclosure information']]]]);
+foreach (['encl.json', 'drives.json', 'drives_noencl.json'] as $f) file_put_contents("$d4/$f", $fail);
+file_put_contents("$d4/timings", "encl.json|66|1160\ndrives.json|255|1132\ndrives_noencl.json|255|1159\nses_sg9.json|0|5\n", FILE_APPEND);
+file_put_contents("$d4/storcli.path", "/usr/sbin/storcli64\n");
+file_put_contents("$d4/lsscsi.txt", "[0:0:0:0]    enclosu LSI      VirtualSES       03    -          /dev/sg9 \n" . file_get_contents("$d4/lsscsi.txt"));
+file_put_contents("$d4/ses_sg9.json", ses_json_slots(48));
+$m4 = load($d4);
+t(!array_filter($m4['problems'], fn($p) => $p['level'] === 'warn') && count(matching($m4, "/^storcli could not read enclosures or drives \\(Failed to get enclosure information\\); bays and drives are shown from SES and the kernel's view\\.$/", 'info')) === 1,
+  'storcli declining is one note: ' . dump_problems($m4));
+t(!$m4['other_ses'] && count($m4['shelves']) === 2 && !$m4['enclosures'], 'the HBA\'s VirtualSES is not shown as an enclosure');
+$d5 = "$tmp/storcli-declined-megaraid";
+copy_dir("$fx/storcli-direct", $d5);
+file_put_contents("$d5/drives.json", $fail);
+file_put_contents("$d5/timings", str_replace('drives.json|0|', 'drives.json|255|', file_get_contents("$d5/timings")));
+t(count(matching(load($d5), '/^storcli could not read drives \(Failed to get enclosure information\)\.$/', 'warn')) === 1, 'without a kernel view of the controller it stays a warning');
 
 // The layout picked on the page, per shelf.
 t(st_layouts_read() === [] && st_layout_write('5003048001F0A03E', 'sm-216') && st_layout_write('5003048001F0B03E', 'grid'), 'layouts written');

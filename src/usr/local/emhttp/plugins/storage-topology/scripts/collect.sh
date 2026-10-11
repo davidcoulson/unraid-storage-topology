@@ -36,7 +36,8 @@ run() {
   s=$(date +%s%3N)
   # (Braces: a command that crashes is noted in its .err file rather than by bash on the collector's stderr.)
   { timeout -k 5 "$t" nice -n 10 "$@" >"$NEW/$name" 2>"$NEW/$name.err"; } 2>/dev/null; rc=$?
-  [ $rc -gt 128 ] && [ $rc -ne 137 ] && echo "terminated by signal $((rc - 128))" >>"$NEW/$name.err"
+  # 129-192 is a signal (137: killed by timeout -k, noted as such by the page); 255 is a program's own exit(-1).
+  [ $rc -gt 128 ] && [ $rc -le 192 ] && [ $rc -ne 137 ] && echo "terminated by signal $((rc - 128))" >>"$NEW/$name.err"
   echo "$name|$rc|$(( $(date +%s%3N) - s ))" >>"$NEW/timings"
   [ -s "$NEW/$name.err" ] || rm -f "$NEW/$name.err"
   return $rc
