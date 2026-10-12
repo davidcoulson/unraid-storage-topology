@@ -1,9 +1,0 @@
-<CommunityApplications>
-  <Profile>
-Storage Topology adds two read-only pages under Tools → System Information. Storage Topology shows how your SAS storage is wired and how healthy it is: controllers and per-lane link rates, the cable map, disk shelves (I/O modules, power supplies, fans, temperatures, bays), firmware versions, and each drive mapped to its Unraid disk name. Network Topology shows your physical NICs, ports, transceivers, bonds, bridges, VLANs and LLDP neighbours, with link health and error counters.
-
-Support is in the Unraid forum thread; bugs can also go to GitHub issues.
-  </Profile>
-  <WebPage>https://github.com/davidcoulson/unraid-storage-topology</WebPage>
-  <Forum>https://forums.unraid.net/topic/200846-plugin-storage-topology-sas-controllers-cables-shelves-and-bays-at-a-glance/</Forum>
-</CommunityApplications>
