@@ -229,7 +229,7 @@ table.st td.num,table.st th.num{text-align:right;white-space:nowrap}
   $spd = $x['configured'] && $x['rated'] && $x['configured'] < $x['rated'] ? 'info' : 'ok';
 ?>
 <tr<?=$x['present'] ? '' : " class='st-dim'"?>>
-<?if ($first):?><td rowspan="<?=count($c['dimms'])?>"><b><?=$h(count(array_unique(array_column($mem['channels'], 'socket'))) > 1 ? "P{$c['socket']} " : '')?><?=$h($c['channel'])?></b><?=$e ? "<br><span class='st-dim' style='font-size:.85em' title='EDAC numbers channels by memory controller (UMC), the board by letter. They were paired in order because the populated channels match in number and size; the board manual has the authoritative mapping.'>EDAC ch {$e['channel']}*</span>" : ''?></td><?endif;?>
+<?if ($first):?><td rowspan="<?=count($c['dimms'])?>"><b><?=$h(count(array_unique(array_column($mem['channels'], 'socket'))) > 1 ? "P{$c['socket']} " : '')?><?=$h($c['channel'])?></b><?=$e ? "<br><span class='st-dim' style='font-size:.85em' title='EDAC numbers channels by memory controller (UMC), the board by letter. They are paired in order only because the populated channels match in number and size: an assumption, not read from the hardware. The board manual has the real mapping.'>EDAC ch {$e['channel']}*</span>" : ''?></td><?endif;?>
 <td><?=$h($x['locator'])?></td>
 <?if ($x['present']):?>
 <td class="num"><?=$h(pci_bytes_text($x['bytes']))?></td><td title="<?=$h($x['serial'] !== '' ? "Serial $x[serial]" : '')?>"><?=$h(trim($x['vendor'] . ' ' . $x['part']))?></td>
@@ -253,7 +253,7 @@ table.st td.num,table.st th.num{text-align:right;white-space:nowrap}
 <?endforeach;?>
 </table>
 <?elseif ($mem['edac_mapped']):?>
-<p class="st-dim" style="margin:4px 0 0 0">* EDAC channel numbers are paired with the board's channel letters in order (they match in number and size); check the board manual if an error is reported.</p>
+<p class="st-dim" style="margin:4px 0 0 0">* EDAC channel numbers are paired with the board's channel letters in order because they match in number and size. That is an assumption (identical DIMMs fit any order), not read from the hardware: before replacing a DIMM, confirm it with the board manual or the BMC/BIOS event log.</p>
 <?endif;?>
 <?else:?>
 <p class="st-dim">dmidecode reported no memory devices.</p>

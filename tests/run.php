@@ -798,7 +798,15 @@ $m2 = pload($d);
 $ce = pkeys($m2, 'ecc-ce|'); $ue = pkeys($m2, 'ecc-ue|');
 t(count($ce) === 1 && $ce[0]['level'] === 'warn' && str_starts_with($ce[0]['text'], 'Memory: 7 corrected ECC errors on ') && count($ue) === 1 && $ue[0]['level'] === 'crit' && $m2['level'] === 'crit',
   'ECC: 7 corrected (warn) and 1 uncorrectable (crit): ' . dump_problems($m2));
-t((bool)preg_match('/channel [A-H]/', $ce[0]['text'] ?? ''), 'ECC errors name the board channel letter: ' . ($ce[0]['text'] ?? ''));
+t((bool)preg_match('/^Memory: 7 corrected ECC errors on EDAC mc0 channel \d \(probably board channel [A-H], DIMM 0\)/', $ce[0]['text'] ?? '') && str_contains($ue[0]['text'] ?? '', 'is a guess: confirm the DIMM'),
+  'ECC errors name the EDAC channel, the board channel only as probable: ' . ($ce[0]['text'] ?? ''));
+// Errors counted by the controller but by no channel: still flagged.
+$d = pvariant('ecc-mc', fn($d) => pedit($d, 'edac.txt', fn($s) => str_replace(['mc0/ue_count:0', 'mc0/ce_count:0'], ['mc0/ue_count:7', 'mc0/ce_count:3'], $s)));
+$m2 = pload($d);
+t(count(pkeys($m2, 'ecc-ue-mc|0')) === 1 && pkeys($m2, 'ecc-ue-mc|0')[0]['level'] === 'crit' && str_contains(pkeys($m2, 'ecc-ue-mc|0')[0]['text'], '7 uncorrectable ECC errors not attributed to a channel')
+  && count(pkeys($m2, 'ecc-ce-mc|0')) === 1 && $m2['level'] === 'crit', 'controller-only ECC counts: crit and warn: ' . dump_problems($m2));
+$m3 = pload("$tmp/pci-ecc");
+t(!pkeys($m3, 'ecc-ue-mc|') && !pkeys($m3, 'ecc-ce-mc|'), 'errors already attributed to channels are not counted twice at the controller');
 // Population: channel H empty, channel G with a 32 GiB DIMM, one DIMM at 2933 of 3200.
 $d = pvariant('unbalanced', function ($d) {
   pedit($d, 'dmidecode.txt', function ($s) {
@@ -846,6 +854,9 @@ t(count(matching($m2, '/^VM "Ubuntu" has its vCPUs on 2 L3 caches/', 'info')) ==
 t(count(matching($m2, '/^0000:23:00\.0 .*: 12 corrected PCIe errors since boot \(RxErr 12\)/', 'info')) === 1 && count(matching($m2, '/^0000:23:00\.0 .*: 1 fatal PCIe error since boot/', 'crit')) === 1,
   'AER: corrected info, fatal crit: ' . dump_problems($m2));
 
+// cpusets: ranges, libvirt exclusions, the kernel's stride form.
+t(pci_cpulist(pci_cpus('0-7,^3')) === '0-2,4-7' && pci_cpulist(pci_cpus('0-7,^2-3,12')) === '0-1,4-7,12' && pci_cpulist(pci_cpus('0-15:2/8')) === '0-1,8-9' && pci_cpus('') === [],
+  'cpuset parsing: ^ exclusions and stride');
 // libvirt XML: only names, pinning, memory, hugepages and PCI hostdevs come out; nothing else of the XML.
 $xml = <<<XML
 <domstatus state='running'><domain type='kvm' id='3'>

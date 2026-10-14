@@ -19,14 +19,21 @@ function pci_worst(array $levels): string {
   return 'ok';
 }
 
-// "0-7,64-71" -> [0..7, 64..71]
+// "0-7,64-71" -> [0..7, 64..71]; libvirt's "0-7,^3" excludes 3; the kernel's "0-31:2/8" takes 2 of every 8.
 function pci_cpus(string $list): array {
-  $out = [];
+  $out = []; $not = [];
   foreach (explode(',', trim($list)) as $part) {
-    if (preg_match('/^(\d+)-(\d+)(?::(\d+)\/\d+)?$/', trim($part), $mm)) { for ($i = (int)$mm[1]; $i <= (int)$mm[2]; $i++) $out[] = $i; }
-    elseif (preg_match('/^\d+$/', trim($part))) $out[] = (int)$part;
+    $part = trim($part);
+    $neg = str_starts_with($part, '^');
+    if ($neg) $part = substr($part, 1);
+    $set = [];
+    if (preg_match('/^(\d+)-(\d+)(?::(\d+)\/(\d+))?$/', $part, $mm)) {
+      $use = isset($mm[3]) ? (int)$mm[3] : 1; $grp = isset($mm[4]) ? max(1, (int)$mm[4]) : 1;
+      for ($i = (int)$mm[1]; $i <= (int)$mm[2]; $i++) if (($i - (int)$mm[1]) % $grp < $use) $set[] = $i;
+    } elseif (preg_match('/^\d+$/', $part)) $set[] = (int)$part;
+    if ($neg) $not = array_merge($not, $set); else $out = array_merge($out, $set);
   }
-  $out = array_values(array_unique($out));
+  $out = array_values(array_diff(array_unique($out), $not));
   sort($out);
   return $out;
 }
@@ -648,12 +655,17 @@ function pci_problems(array &$m): void {
   foreach ($mem['edac'] as $mc) {
     $label = fn($c) => pci_mem_edac_label($mem, $mc['mc'], $c['channel']);
     foreach ($mc['channels'] as $c) {
-      if ($c['ue'] > 0) $add('crit', "Memory: {$c['ue']} uncorrectable ECC error" . ($c['ue'] === 1 ? '' : 's') . " on {$label($c)}. Replace or reseat that DIMM.", 'mem', "ecc-ue|{$mc['mc']}|{$c['channel']}", (string)$c['ue']);
+      if ($c['ue'] > 0) $add('crit', "Memory: {$c['ue']} uncorrectable ECC error" . ($c['ue'] === 1 ? '' : 's') . " on {$label($c)}. The pairing of EDAC channels with board slots is a guess: confirm the DIMM in the board manual or the BMC/BIOS event log before reseating or replacing it.", 'mem', "ecc-ue|{$mc['mc']}|{$c['channel']}", (string)$c['ue']);
       if ($c['ce'] > 0) $add('warn', "Memory: {$c['ce']} corrected ECC error" . ($c['ce'] === 1 ? '' : 's') . " on {$label($c)} since " . ($mc['since'] !== null ? 'the counters were reset (' . pci_duration($mc['since']) . ' ago)' : 'boot')
         . '. A count that keeps growing means the DIMM is failing.', 'mem', "ecc-ce|{$mc['mc']}|{$c['channel']}", (string)$c['ce']);
     }
     if ($mc['ue_noinfo'] > 0) $add('crit', "Memory controller {$mc['mc']}: {$mc['ue_noinfo']} uncorrectable ECC errors without a location.", 'mem', "ecc-ue-noinfo|{$mc['mc']}", (string)$mc['ue_noinfo']);
     if ($mc['ce_noinfo'] > 0) $add('warn', "Memory controller {$mc['mc']}: {$mc['ce_noinfo']} corrected ECC errors without a location.", 'mem', "ecc-ce-noinfo|{$mc['mc']}", (string)$mc['ce_noinfo']);
+    // Errors the controller counted that no channel (or the noinfo counters) accounts for.
+    $ueLeft = $mc['ue'] - array_sum(array_column($mc['channels'], 'ue')) - $mc['ue_noinfo'];
+    $ceLeft = $mc['ce'] - array_sum(array_column($mc['channels'], 'ce')) - $mc['ce_noinfo'];
+    if ($ueLeft > 0) $add('crit', "Memory controller {$mc['mc']} ({$mc['name']}): $ueLeft uncorrectable ECC error" . ($ueLeft === 1 ? '' : 's') . ' not attributed to a channel. Check the BMC/BIOS event log.', 'mem', "ecc-ue-mc|{$mc['mc']}", (string)$ueLeft);
+    if ($ceLeft > 0) $add('warn', "Memory controller {$mc['mc']} ({$mc['name']}): $ceLeft corrected ECC error" . ($ceLeft === 1 ? '' : 's') . ' not attributed to a channel. A count that keeps growing means a DIMM is failing.', 'mem', "ecc-ce-mc|{$mc['mc']}", (string)$ceLeft);
   }
   $ecc = preg_match('/ECC/i', $mem['array']['Error Correction Type'] ?? '') && !preg_match('/^None/i', $mem['array']['Error Correction Type'] ?? '');
   if (!$mem['edac'] && $ecc) $add('info', 'Memory: the board reports ECC memory, but no EDAC driver is loaded (/sys/devices/system/edac/mc is empty), so corrected and uncorrectable errors are not counted here.', 'mem', 'edac-missing', '');
@@ -688,7 +700,7 @@ function pci_problems(array &$m): void {
 function pci_mem_edac_label(array $mem, int $mc, int $ch): string {
   foreach ($mem['channels'] as $c) if ($c['edac'] && $c['edac']['mc'] === $mc && $c['edac']['channel'] === $ch) {
     $locs = implode('/', array_map(fn($x) => $x['locator'], array_filter($c['dimms'], fn($x) => $x['present'])));
-    return "channel {$c['channel']}" . ($locs !== '' ? " ($locs)" : '') . " (EDAC mc$mc channel $ch)";
+    return "EDAC mc$mc channel $ch (probably board channel {$c['channel']}" . ($locs !== '' ? ", $locs" : '') . ')';
   }
   return "memory controller $mc channel $ch";
 }
