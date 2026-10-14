@@ -2,8 +2,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.19">
-<!ENTITY md5        "04405c9bfa0c84a86415e5eab3903ed6">
+<!ENTITY version    "2026.10.20">
+<!ENTITY md5        "8bfe3f6b0a8e415831bc8c1e1d7f6aa7">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">

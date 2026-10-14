@@ -17,14 +17,20 @@ for f in "$PLUG"/scripts/*.sh; do bash -n "$f"; done
 if command -v php >/dev/null; then php tests/run.php; else echo "php not found: skipping tests/run.php"; fi
 
 chmod 755 "$PLUG/scripts/"*.sh
+chmod 644 "$PLUG/scripts/"*.php
 find "$SRC" -type d -exec chmod 755 {} +
 find "$SRC" -type f ! -path '*/scripts/*' -exec chmod 644 {} +
 
 mkdir -p archive
 rm -f "archive/$PKG"
-# Root-owned, no macOS metadata, paths relative to / as installpkg expects.
-COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata --uid 0 --gid 0 --uname root --gname root \
-  -C "$SRC" -cJf "archive/$PKG" usr
+# Root-owned, no macOS metadata, paths relative to / as installpkg expects. bsdtar (macOS) and GNU tar (Linux)
+# spell the options differently.
+if tar --version 2>/dev/null | grep -q bsdtar; then
+  COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata --uid 0 --gid 0 --uname root --gname root \
+    -C "$SRC" -cJf "archive/$PKG" usr
+else
+  tar --no-xattrs --owner=0 --group=0 --numeric-owner --sort=name -C "$SRC" -cJf "archive/$PKG" usr
+fi
 
 MD5=$(md5 -q "archive/$PKG" 2>/dev/null || md5sum "archive/$PKG" | cut -d' ' -f1)
 sed -i.bak -E \
