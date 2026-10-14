@@ -217,13 +217,17 @@ table.st td.num,table.st th.num{text-align:right;white-space:nowrap}
 <div><span>Error correction</span><?=$h($mem['array']['Error Correction Type'] ?? '-')?></div>
 <div><span>Board maximum</span><?=$h($mem['array']['Maximum Capacity'] ?? '-')?> in <?=$h($mem['array']['Number Of Devices'] ?? '?')?> slots</div>
 <?endif;?>
+<?if (!array_filter($mem['channels'], fn($c) => !$c['known'])):?>
 <div><span>Channels populated</span><?=count(array_filter($mem['channels'], fn($c) => $c['populated'] > 0))?> of <?=count($mem['channels'])?></div>
+<?else:?>
+<div><span>Slots populated</span><?=count(array_filter($mem['dimms'], fn($x) => $x['present']))?> of <?=count($mem['dimms'])?> (the slot labels do not name a channel)</div>
+<?endif;?>
 <?foreach ($mem['edac'] as $mc):?><div><span>EDAC mc<?=$mc['mc']?></span><?=$h($mc['name'])?>: <?=number_format($mc['ce'])?> corrected, <?=number_format($mc['ue'])?> uncorrectable<?=$mc['since'] !== null ? ' in ' . $h(pci_duration($mc['since'])) : ''?></div><?endforeach;?>
 <?if (!$mem['edac']):?><div><span>EDAC</span>not loaded (no ECC counters)</div><?endif;?>
 </div>
 <?if ($mem['channels']):?>
 <div class="st-scroll"><table class="st">
-<tr><th>Channel</th><th>Slot</th><th class="num">Size</th><th>Module</th><th>Type</th><th class="num">Rank</th><th class="num">Speed (MT/s)</th><th class="num">ECC corrected</th><th class="num">Uncorrectable</th></tr>
+<tr><th><?=array_filter($mem['channels'], fn($c) => !$c['known']) ? 'Bank' : 'Channel'?></th><th>Slot</th><th class="num">Size</th><th>Module</th><th>Type</th><th class="num">Rank</th><th class="num">Speed (MT/s)</th><th class="num">ECC corrected</th><th class="num">Uncorrectable</th></tr>
 <?foreach ($mem['channels'] as $c): $first = true; foreach ($c['dimms'] as $x):
   $e = $c['edac'];
   $spd = $x['configured'] && $x['rated'] && $x['configured'] < $x['rated'] ? 'info' : 'ok';

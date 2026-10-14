@@ -824,6 +824,25 @@ t(count(matching($m2, '/^Memory only 7 of 8 channels have a DIMM \(H empty\)/', 
 t(count(matching($m2, '/^Memory channels hold different amounts \(.*G 32 GiB.*\)/', 'warn')) === 1, 'channel G with less memory: unbalanced');
 t(count(matching($m2, '/^Memory runs at 2933 of 3200 MT\/s rated \(1 of 7 DIMMs\)/', 'info')) === 1, 'one DIMM below its rated speed: info');
 t(!$m2['mem']['edac_mapped'], 'EDAC not paired with letters when the populated channels differ');
+// A desktop board whose DMI labels name no channel ("DIMM 0".."DIMM 3", "BANK 0".."BANK 3"), two of four slots used:
+// that can be both channels filled, so no population or balance warning, and no EDAC pairing.
+$d = pvariant('slots', function ($d) {
+  pedit($d, 'dmidecode.txt', function ($s) {
+    $blocks = explode("\n\n", $s); $n = 0; $out = [];
+    foreach ($blocks as $b) {
+      if (!str_contains($b, "\nMemory Device\n")) { $out[] = $b; continue; }
+      if ($n >= 4) continue;
+      $b = preg_replace(['/\tLocator: .*/', '/\tBank Locator: .*/'], ["\tLocator: DIMM $n", "\tBank Locator: BANK $n"], $b);
+      if ($n === 1 || $n === 3) $b = preg_replace(['/\tSize: 64 GiB/'], ["\tSize: No Module Installed"], $b);
+      if ($n === 2) $b = str_replace("\tSize: 64 GiB", "\tSize: 32 GiB", $b);
+      $out[] = $b; $n++;
+    }
+    return implode("\n\n", $out);
+  });
+});
+$m2 = pload($d);
+t(!pkeys($m2, 'mem-channels|') && !pkeys($m2, 'mem-balance|') && !$m2['mem']['edac_mapped'] && count($m2['mem']['dimms']) === 4,
+  'unidentified channels: no population/balance conclusions, no EDAC pairing: ' . dump_problems($m2));
 // Two NUMA nodes (NPS2-like): the 4090 on node 1, Windows 11 running on node 0 CPUs.
 $d = pvariant('numa', function ($d) {
   pedit($d, 'nodes.txt', fn($s) => "node|0|0-31,64-95|263975426|10 12\nnode|1|32-63,96-127|263975426|12 10\nhuge|0|1048576kB|32|32|0\nhuge|1|1048576kB|32|32|0\nhuge|0|2048kB|0|0|0\nhuge|1|2048kB|0|0|0\n");
@@ -907,10 +926,11 @@ t(str_contains($html, '21:00.0</span>Broadcom PEX880xx') && str_contains($html, 
 t(str_contains($html, '>VM Windows 11</span>') && str_contains($html, 'empty (max Gen4 x4)') && str_contains($html, 'Windows 11 (32 GiB, stopped)'), 'pci page: passthrough, empty port, hugepage user');
 t(str_contains($html, "data-space='pci'") || str_contains($html, 'data-space="pci"') || str_contains($html, "'pci'"), 'pci page: problems posted to the pci ack space');
 t(!str_contains($html, 'Collector exit'), 'stub collector: no collector warning');
-foreach (['ecc', 'unbalanced', 'numa', 'vms'] as $v) {
+foreach (['ecc', 'unbalanced', 'numa', 'vms', 'slots'] as $v) {
   [$html, $err] = render_pci("$tmp/pci-$v");
   t($err === '' && str_contains($html, '</table>'), "pci page renders the $v variant: $err");
   if ($v === 'numa') t(str_contains($html, '<h4>NUMA nodes</h4>') && str_contains($html, '<th>NUMA</th>'), 'two nodes: node table and NUMA column');
+  if ($v === 'slots') t(str_contains($html, '<span>Slots populated</span>2 of 4 (the slot labels do not name a channel)') && str_contains($html, '<th>Bank</th>'), 'unidentified channels: slots, not channels');
   if ($v === 'unbalanced') t(str_contains($html, '<h4>EDAC counters</h4>'), 'unpaired EDAC channels listed as EDAC reports them');
 }
 

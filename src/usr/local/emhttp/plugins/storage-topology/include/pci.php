@@ -510,7 +510,8 @@ function pci_memory(string $dir, array &$m): void {
   $edacChans = [];
   foreach ($edac as $mc) foreach ($mc['channels'] as $c) if ($c['size_mb'] > 0) $edacChans[] = ['mc' => $mc['mc']] + $c;
   $mapped = false;
-  if ($popChans && count($popChans) === count($edacChans)) {
+  $known = $chans && !array_filter($chans, fn($c) => !$c['known']);
+  if ($known && $popChans && count($popChans) === count($edacChans)) {
     $mapped = true;
     foreach ($popChans as $i => $c) if (abs($c['bytes'] / 1048576 - $edacChans[$i]['size_mb']) > 1) $mapped = false;
     if ($mapped) foreach ($popChans as $i => $c) $chans[$c['key']]['edac'] = $edacChans[$i];
@@ -674,6 +675,9 @@ function pci_problems(array &$m): void {
     $bySock = [];
     foreach ($chans as $c) $bySock[$c['socket']][] = $c;
     foreach ($bySock as $s => $cs) {
+      // Without a channel in the DMI labels (e.g. "DIMM0".."DIMM3"), slots cannot be grouped into channels: two
+      // DIMMs in four slots may well fill both channels. No population or balance conclusions then.
+      if (array_filter($cs, fn($c) => !$c['known'])) continue;
       $pop = array_filter($cs, fn($c) => $c['populated'] > 0);
       $tag = count($bySock) > 1 ? "socket $s: " : '';
       if ($pop && count($pop) < count($cs))
