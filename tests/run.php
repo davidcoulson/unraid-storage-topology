@@ -889,6 +889,14 @@ $d = pvariant('group', function ($d) {
 $m2 = pload($d);
 $vg = pkeys($m2, 'vm-group|Windows 11|0000:24:00.0|');
 t(count($vg) === 1 && $vg[0]['key'] === 'vm-group|Windows 11|0000:24:00.0|0000:23:00.0' && str_contains($vg[0]['text'], 'bound to the host driver nvme'), 'IOMMU group: host-bound sibling flagged, unbound sibling not: ' . dump_problems($m2));
+// Two VMs with different functions of one group: the running Ubuntu VM takes the 4090's audio function (group of
+// 01:00.0), so the stopped Windows 11 VM cannot start.
+$d = pvariant('owner', function ($d) {
+  pedit($d, 'vms.txt', fn($s) => str_replace('hostdev|Windows 11|0000:01:00.1' . "\n", '', $s) . "hostdev|Ubuntu|0000:01:00.1\n");
+});
+$m2 = pload($d);
+$own = pkeys($m2, 'vm-group-owner|');
+t(count($own) === 1 && $own[0]['key'] === 'vm-group-owner|Windows 11|0000:01:00.0' && str_contains($own[0]['text'], 'which the running VM "Ubuntu" holds'), 'group held by another running VM: warn: ' . dump_problems($m2));
 // libvirt XML: only names, pinning, memory, hugepages and PCI hostdevs come out; nothing else of the XML.
 $xml = <<<XML
 <domstatus state='running'><domain type='kvm' id='3'>

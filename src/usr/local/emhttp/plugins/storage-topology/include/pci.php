@@ -599,6 +599,10 @@ function pci_problems(array &$m): void {
 
   // VMs: passthrough devices present and bound to vfio-pci, groups, NUMA/CCD placement, pinning overlaps, hugepages.
   $pinnedBy = [];
+  // IOMMU groups held by running VMs: VFIO hands a whole group to one VM, so no other VM can take any of it.
+  $groupOwner = [];
+  foreach ($m['vms'] as $name => $vm) if ($vm['running']) foreach ($vm['hostdevs'] as $hb)
+    if (isset($dev[$hb]) && $dev[$hb]['group'] !== null) $groupOwner[$dev[$hb]['group']] = $name;
   foreach ($m['vms'] as $name => $vm) {
     $pins = [];
     foreach ($vm['pins'] as $set) $pins = array_merge($pins, pci_cpus($set));
@@ -609,6 +613,10 @@ function pci_problems(array &$m): void {
       $m['devices'][$hb]['vms'][] = $name;
       if ($vm['running'] && $d['driver'] !== 'vfio-pci')
         $add('warn', "VM \"$name\" is running, but its passthrough device " . pci_dev_label($d) . ' is bound to ' . ($d['driver'] ?: 'no driver') . ', not vfio-pci.', $hb, "vm-driver|$name|$hb", $d['driver']);
+      $owner = $d['group'] !== null ? ($groupOwner[$d['group']] ?? null) : null;
+      if ($owner !== null && $owner !== $name)
+        $add('warn', "VM \"$name\" passes through " . pci_dev_label($d) . " in IOMMU group {$d['group']}, which the running VM \"$owner\" holds. "
+          . "It cannot start while \"$owner\" runs: a group goes to one VM.", $hb, "vm-group-owner|$name|$hb", $owner);
       // Other endpoints in the same IOMMU group must go to the VM as well, or be bound to vfio-pci (or pci-stub), or
       // have no driver at all: VFIO accepts unbound devices in a group.
       foreach ($m['groups'][$d['group']] ?? [] as $o) {
