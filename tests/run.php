@@ -852,6 +852,13 @@ $d = pvariant('numa', function ($d) {
 });
 $m2 = pload($d);
 t(count($m2['cpu']['nodes']) === 2 && $m2['cpu']['nps'] === 'NPS2', 'two nodes over 8 L3 caches: NPS2: ' . $m2['cpu']['nps']);
+$hp = pkeys($m2, 'huge|');
+t(!$hp, 'numa variant: 64 x 1G over two nodes is enough for Windows 11 without numatune: ' . dump_problems($m2));
+// The same with Windows 11 bound to node 1 (strict), which has only 16 of the pages.
+pedit($d, 'nodes.txt', fn($s) => str_replace(['huge|0|1048576kB|32|32|0', 'huge|1|1048576kB|32|32|0'], ['huge|0|1048576kB|48|48|0', 'huge|1|1048576kB|16|16|0'], $s));
+pedit($d, 'vms.txt', fn($s) => $s . "numa|Windows 11|1|strict\n");
+$m3 = pload($d);
+t(count(matching($m3, '/^VM "Windows 11" uses 1 GiB hugepages for 32 GiB \(32 pages\), but only 16 are reserved on NUMA node 1 \(numatune strict\)\. It will not start\./', 'warn')) === 1, 'strict numatune: hugepages counted on its node only: ' . dump_problems($m3));
 $vn = pkeys($m2, 'vm-numa|Windows 11|');
 t(count($vn) === 2 && $vn[0]['level'] === 'warn' && str_contains($vn[0]['text'], 'on NUMA node 1, but its vCPUs are pinned to node(s) 0'), 'VM on node 0 with its GPU on node 1: warn: ' . dump_problems($m2));
 t(count(pkeys($m2, 'numa-irq|0000:20:01.1')) === 1 && !pkeys($m2, 'numa-irq|0000:02:00.0'), 'root port on node 1 with its interrupt on CPU 23 (node 0) flagged; the MegaRAID, with queues on both nodes, not: ' . dump_problems($m2));
@@ -917,7 +924,7 @@ $xml = <<<XML
 XML;
 $vm = pci_vm_parse($xml);
 t($vm !== null && $vm['name'] === 'Gaming VM' && $vm['mem_kib'] === 16 << 20 && $vm['huge_kib'] === 1048576 && $vm['pins'] === [0 => '8', 1 => '72'] && $vm['emu'] === '2,66'
-  && $vm['numa'] === '0' && $vm['hostdevs'] === ['0000:0a:00.1', '0000:41:00.2'], 'live (domstatus) XML parsed, with an <interface type=hostdev> VF: ' . json_encode($vm));
+  && $vm['numa'] === '0' && $vm['numa_mode'] === 'strict' && $vm['hostdevs'] === ['0000:0a:00.1', '0000:41:00.2'], 'live (domstatus) XML parsed, with an <interface type=hostdev> VF: ' . json_encode($vm));
 $lines = implode("\n", pci_vm_lines($vm, true));
 t(!preg_match('/hunter2|52:54:00|aa:bb:cc|secret-name|0b0c0d0e|vdisk/', $lines), 'VM lines carry no disks, MACs, passwords or UUIDs');
 $vms = pci_parse_vms(explode("\n", $lines));

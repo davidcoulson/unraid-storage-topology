@@ -230,7 +230,7 @@ function pci_vm_parse(string $xml): ?array {
       'g' => 1048576, 'gib' => 1048576, 'gb' => 1e9 / 1024][$u] ?? 1));
   };
   $vm = ['name' => (string)$dom->name, 'vcpus' => (int)$dom->vcpu, 'mem_kib' => isset($dom->memory) ? $kib($dom->memory) : 0, 'huge_kib' => null,
-         'pins' => [], 'emu' => '', 'numa' => '', 'hostdevs' => []];
+         'pins' => [], 'emu' => '', 'numa' => '', 'numa_mode' => '', 'hostdevs' => []];
   if (isset($dom->memoryBacking->hugepages)) {
     // No <page>: the default hugepage size (0 here, resolved by the page).
     $page = $dom->memoryBacking->hugepages->page[0] ?? null;
@@ -239,7 +239,7 @@ function pci_vm_parse(string $xml): ?array {
   }
   foreach ($dom->cputune->vcpupin ?? [] as $p) $vm['pins'][(int)$p['vcpu']] = (string)$p['cpuset'];
   if (isset($dom->cputune->emulatorpin)) $vm['emu'] = (string)$dom->cputune->emulatorpin['cpuset'];
-  if (isset($dom->numatune->memory)) $vm['numa'] = (string)$dom->numatune->memory['nodeset'];
+  if (isset($dom->numatune->memory)) { $vm['numa'] = (string)$dom->numatune->memory['nodeset']; $vm['numa_mode'] = (string)$dom->numatune->memory['mode'] ?: 'strict'; }
   // PCI passthrough: <hostdev type='pci'> and SR-IOV/NIC passthrough as <interface type='hostdev'>.
   $hex = fn($s, $w) => str_pad(strtolower(preg_replace('/^0x/i', '', (string)$s)), $w, '0', STR_PAD_LEFT);
   $srcs = [];
@@ -260,7 +260,7 @@ function pci_vm_lines(array $vm, bool $running): array {
   $out = ["vm|$n|" . ($running ? 1 : 0) . "|{$vm['vcpus']}|{$vm['mem_kib']}|" . ($vm['huge_kib'] ?? '')];
   foreach ($vm['pins'] as $v => $set) $out[] = "pin|$n|$v|$set";
   if ($vm['emu'] !== '') $out[] = "emu|$n|{$vm['emu']}";
-  if ($vm['numa'] !== '') $out[] = "numa|$n|{$vm['numa']}";
+  if ($vm['numa'] !== '') $out[] = "numa|$n|{$vm['numa']}|" . ($vm['numa_mode'] ?? 'strict');
   foreach ($vm['hostdevs'] as $b) $out[] = "hostdev|$n|$b";
   return $out;
 }
@@ -271,11 +271,11 @@ function pci_parse_vms(array $lines): array {
     $f = explode('|', $l);
     $n = $f[1] ?? '';
     if ($f[0] === 'vm' && count($f) >= 6) $vms[$n] = ['name' => $n, 'running' => $f[2] === '1', 'vcpus' => (int)$f[3], 'mem_kib' => (int)$f[4],
-      'huge_kib' => $f[5] === '' ? null : (int)$f[5], 'pins' => [], 'emu' => '', 'numa' => '', 'hostdevs' => []];
+      'huge_kib' => $f[5] === '' ? null : (int)$f[5], 'pins' => [], 'emu' => '', 'numa' => '', 'numa_mode' => '', 'hostdevs' => []];
     elseif (!isset($vms[$n])) continue;
     elseif ($f[0] === 'pin') $vms[$n]['pins'][(int)$f[2]] = $f[3] ?? '';
     elseif ($f[0] === 'emu') $vms[$n]['emu'] = $f[2] ?? '';
-    elseif ($f[0] === 'numa') $vms[$n]['numa'] = $f[2] ?? '';
+    elseif ($f[0] === 'numa') { $vms[$n]['numa'] = $f[2] ?? ''; $vms[$n]['numa_mode'] = ($f[3] ?? '') ?: 'strict'; }
     elseif ($f[0] === 'hostdev') $vms[$n]['hostdevs'][] = $f[2] ?? '';
   }
   ksort($vms, SORT_NATURAL | SORT_FLAG_CASE);
@@ -656,12 +656,19 @@ function pci_problems(array &$m): void {
     if ($vm['huge_kib'] === null || !$vm['mem_kib']) continue;
     $size = $vm['huge_kib'] ?: (int)($m['meminfo']['Hugepagesize'] ?? 2048);
     $need = (int)ceil($vm['mem_kib'] / $size);
-    $h = $m['huge'][$size] ?? ['total' => 0, 'free' => 0];
+    $h = $m['huge'][$size] ?? ['total' => 0, 'free' => 0, 'nodes' => []];
     $sz = pci_bytes_text($size * 1024);
+    // A strict (or restrictive) numatune can only take pages from its nodes.
+    $where = '';
+    if ($vm['numa'] !== '' && in_array($vm['numa_mode'], ['strict', 'restrictive'], true) && count($h['nodes'] ?? []) > 1) {
+      $ns = pci_cpus($vm['numa']);
+      $h = ['total' => array_sum(array_map(fn($n) => $h['nodes'][$n]['total'] ?? 0, $ns)), 'free' => array_sum(array_map(fn($n) => $h['nodes'][$n]['free'] ?? 0, $ns))];
+      $where = ' on NUMA node' . (count($ns) === 1 ? ' ' : 's ') . $vm['numa'] . " (numatune {$vm['numa_mode']})";
+    }
     if ($h['total'] < $need)
-      $add('warn', "VM \"$name\" uses $sz hugepages for " . pci_bytes_text($vm['mem_kib'] * 1024) . " ($need pages), but only {$h['total']} are reserved. It will not start.", 'mem', "huge|$name", "{$h['total']}");
+      $add('warn', "VM \"$name\" uses $sz hugepages for " . pci_bytes_text($vm['mem_kib'] * 1024) . " ($need pages), but only {$h['total']} are reserved$where. It will not start.", 'mem', "huge|$name", "{$h['total']}");
     elseif (!$vm['running'] && $h['free'] < $need)
-      $add('warn', "VM \"$name\" needs $need free $sz hugepages to start, but only {$h['free']} of {$h['total']} are free (other VMs hold the rest).", 'mem', "huge-free|$name", "{$h['free']}");
+      $add('warn', "VM \"$name\" needs $need free $sz hugepages to start, but only {$h['free']} of {$h['total']}$where are free (other VMs hold the rest).", 'mem', "huge-free|$name", "{$h['free']}");
   }
 
   // Memory: ECC counters, population, speed.
