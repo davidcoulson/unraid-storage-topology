@@ -609,12 +609,13 @@ function pci_problems(array &$m): void {
       $m['devices'][$hb]['vms'][] = $name;
       if ($vm['running'] && $d['driver'] !== 'vfio-pci')
         $add('warn', "VM \"$name\" is running, but its passthrough device " . pci_dev_label($d) . ' is bound to ' . ($d['driver'] ?: 'no driver') . ', not vfio-pci.', $hb, "vm-driver|$name|$hb", $d['driver']);
-      // Other endpoints in the same IOMMU group must go to the VM as well (or be bound to vfio-pci).
+      // Other endpoints in the same IOMMU group must go to the VM as well, or be bound to vfio-pci (or pci-stub), or
+      // have no driver at all: VFIO accepts unbound devices in a group.
       foreach ($m['groups'][$d['group']] ?? [] as $o) {
         $od = $dev[$o];
-        if ($o === $hb || in_array($o, $vm['hostdevs'], true) || in_array($od['role'], ['root port', 'switch port', 'switch upstream', 'bridge', 'host bridge'], true) || $od['driver'] === 'vfio-pci') continue;
-        $add('warn', "VM \"$name\": " . pci_dev_label($d) . " shares IOMMU group {$d['group']} with " . pci_dev_label($od) . ', which is not passed through and is bound to '
-          . ($od['driver'] ?: 'no driver') . '. Pass it through as well or bind it to vfio-pci, or the VM cannot start.', $hb, "vm-group|$name|$hb|$o", $od['driver']);
+        if ($o === $hb || in_array($o, $vm['hostdevs'], true) || in_array($od['role'], ['root port', 'switch port', 'switch upstream', 'bridge', 'host bridge'], true) || in_array($od['driver'], ['vfio-pci', 'pci-stub', ''], true)) continue;
+        $add('warn', "VM \"$name\": " . pci_dev_label($d) . " shares IOMMU group {$d['group']} with " . pci_dev_label($od) . ', which is not passed through and is bound to the host driver '
+          . $od['driver'] . '. Pass it through as well or bind it to vfio-pci, or the VM cannot start.', $hb, "vm-group|$name|$hb|$o", $od['driver']);
       }
       if (count($nodes) > 1 && $d['numa'] !== null && $d['numa'] >= 0 && $pins) {
         $vmNodes = array_unique(array_map(fn($c) => $nodeOf[$c] ?? -1, $pins));

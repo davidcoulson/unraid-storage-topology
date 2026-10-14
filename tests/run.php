@@ -876,6 +876,19 @@ t(count(matching($m2, '/^0000:23:00\.0 .*: 12 corrected PCIe errors since boot \
 // cpusets: ranges, libvirt exclusions, the kernel's stride form.
 t(pci_cpulist(pci_cpus('0-7,^3')) === '0-2,4-7' && pci_cpulist(pci_cpus('0-7,^2-3,12')) === '0-1,4-7,12' && pci_cpulist(pci_cpus('0-15:2/8')) === '0-1,8-9' && pci_cpus('') === [],
   'cpuset parsing: ^ exclusions and stride');
+// IOMMU group of the SN850X (24:00.0, Windows 11) shared with an nvme-bound drive (23:00.0) and an unbound one (25:00.0):
+// only the host-bound one blocks the VM.
+$d = pvariant('group', function ($d) {
+  pedit($d, 'pcilinks.txt', function ($s) {
+    $g = preg_match('#0000:24:00\.0\|iommu_group\|(\S+)#', $s, $mm) ? $mm[1] : '';
+    $s = preg_replace('#(0000:2[35]:00\.0\|iommu_group\|)\S+#', '${1}' . $g, $s);
+    return preg_replace('#^.*0000:25:00\.0\|driver\|.*\n#m', '', $s);
+  });
+  pedit($d, 'lspci.txt', fn($s) => preg_replace('/^(0000:25:00\.0 .*?)\n\tKernel driver in use: nvme\n/ms', "\$1\n", $s, 1));
+});
+$m2 = pload($d);
+$vg = pkeys($m2, 'vm-group|Windows 11|0000:24:00.0|');
+t(count($vg) === 1 && $vg[0]['key'] === 'vm-group|Windows 11|0000:24:00.0|0000:23:00.0' && str_contains($vg[0]['text'], 'bound to the host driver nvme'), 'IOMMU group: host-bound sibling flagged, unbound sibling not: ' . dump_problems($m2));
 // libvirt XML: only names, pinning, memory, hugepages and PCI hostdevs come out; nothing else of the XML.
 $xml = <<<XML
 <domstatus state='running'><domain type='kvm' id='3'>
