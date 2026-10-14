@@ -1,0 +1,119 @@
+/sys/devices/system/edac/mc/mc0/mc_name:F19h
+/sys/devices/system/edac/mc/mc0/size_mb:524288
+/sys/devices/system/edac/mc/mc0/ce_count:0
+/sys/devices/system/edac/mc/mc0/ue_count:0
+/sys/devices/system/edac/mc/mc0/ce_noinfo_count:0
+/sys/devices/system/edac/mc/mc0/ue_noinfo_count:0
+/sys/devices/system/edac/mc/mc0/seconds_since_reset:58726
+/sys/devices/system/edac/mc/mc0/rank0/dimm_location:csrow 0 channel 0 
+/sys/devices/system/edac/mc/mc0/rank1/dimm_location:csrow 0 channel 1 
+/sys/devices/system/edac/mc/mc0/rank10/dimm_location:csrow 1 channel 2 
+/sys/devices/system/edac/mc/mc0/rank11/dimm_location:csrow 1 channel 3 
+/sys/devices/system/edac/mc/mc0/rank12/dimm_location:csrow 1 channel 4 
+/sys/devices/system/edac/mc/mc0/rank13/dimm_location:csrow 1 channel 5 
+/sys/devices/system/edac/mc/mc0/rank14/dimm_location:csrow 1 channel 6 
+/sys/devices/system/edac/mc/mc0/rank15/dimm_location:csrow 1 channel 7 
+/sys/devices/system/edac/mc/mc0/rank2/dimm_location:csrow 0 channel 2 
+/sys/devices/system/edac/mc/mc0/rank3/dimm_location:csrow 0 channel 3 
+/sys/devices/system/edac/mc/mc0/rank4/dimm_location:csrow 0 channel 4 
+/sys/devices/system/edac/mc/mc0/rank5/dimm_location:csrow 0 channel 5 
+/sys/devices/system/edac/mc/mc0/rank6/dimm_location:csrow 0 channel 6 
+/sys/devices/system/edac/mc/mc0/rank7/dimm_location:csrow 0 channel 7 
+/sys/devices/system/edac/mc/mc0/rank8/dimm_location:csrow 1 channel 0 
+/sys/devices/system/edac/mc/mc0/rank9/dimm_location:csrow 1 channel 1 
+/sys/devices/system/edac/mc/mc0/rank0/dimm_label:mc#0csrow#0channel#0
+/sys/devices/system/edac/mc/mc0/rank1/dimm_label:mc#0csrow#0channel#1
+/sys/devices/system/edac/mc/mc0/rank10/dimm_label:mc#0csrow#1channel#2
+/sys/devices/system/edac/mc/mc0/rank11/dimm_label:mc#0csrow#1channel#3
+/sys/devices/system/edac/mc/mc0/rank12/dimm_label:mc#0csrow#1channel#4
+/sys/devices/system/edac/mc/mc0/rank13/dimm_label:mc#0csrow#1channel#5
+/sys/devices/system/edac/mc/mc0/rank14/dimm_label:mc#0csrow#1channel#6
+/sys/devices/system/edac/mc/mc0/rank15/dimm_label:mc#0csrow#1channel#7
+/sys/devices/system/edac/mc/mc0/rank2/dimm_label:mc#0csrow#0channel#2
+/sys/devices/system/edac/mc/mc0/rank3/dimm_label:mc#0csrow#0channel#3
+/sys/devices/system/edac/mc/mc0/rank4/dimm_label:mc#0csrow#0channel#4
+/sys/devices/system/edac/mc/mc0/rank5/dimm_label:mc#0csrow#0channel#5
+/sys/devices/system/edac/mc/mc0/rank6/dimm_label:mc#0csrow#0channel#6
+/sys/devices/system/edac/mc/mc0/rank7/dimm_label:mc#0csrow#0channel#7
+/sys/devices/system/edac/mc/mc0/rank8/dimm_label:mc#0csrow#1channel#0
+/sys/devices/system/edac/mc/mc0/rank9/dimm_label:mc#0csrow#1channel#1
+/sys/devices/system/edac/mc/mc0/rank0/size:32768
+/sys/devices/system/edac/mc/mc0/rank1/size:32768
+/sys/devices/system/edac/mc/mc0/rank10/size:32768
+/sys/devices/system/edac/mc/mc0/rank11/size:32768
+/sys/devices/system/edac/mc/mc0/rank12/size:32768
+/sys/devices/system/edac/mc/mc0/rank13/size:32768
+/sys/devices/system/edac/mc/mc0/rank14/size:32768
+/sys/devices/system/edac/mc/mc0/rank15/size:32768
+/sys/devices/system/edac/mc/mc0/rank2/size:32768
+/sys/devices/system/edac/mc/mc0/rank3/size:32768
+/sys/devices/system/edac/mc/mc0/rank4/size:32768
+/sys/devices/system/edac/mc/mc0/rank5/size:32768
+/sys/devices/system/edac/mc/mc0/rank6/size:32768
+/sys/devices/system/edac/mc/mc0/rank7/size:32768
+/sys/devices/system/edac/mc/mc0/rank8/size:32768
+/sys/devices/system/edac/mc/mc0/rank9/size:32768
+/sys/devices/system/edac/mc/mc0/rank0/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank1/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank10/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank11/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank12/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank13/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank14/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank15/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank2/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank3/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank4/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank5/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank6/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank7/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank8/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank9/dimm_ce_count:0
+/sys/devices/system/edac/mc/mc0/rank0/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank1/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank10/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank11/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank12/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank13/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank14/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank15/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank2/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank3/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank4/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank5/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank6/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank7/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank8/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank9/dimm_ue_count:0
+/sys/devices/system/edac/mc/mc0/rank0/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank1/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank10/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank11/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank12/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank13/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank14/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank15/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank2/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank3/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank4/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank5/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank6/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank7/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank8/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank9/dimm_mem_type:Registered-DDR4
+/sys/devices/system/edac/mc/mc0/rank0/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank1/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank10/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank11/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank12/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank13/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank14/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank15/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank2/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank3/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank4/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank5/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank6/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank7/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank8/dimm_edac_mode:S4ECD4ED
+/sys/devices/system/edac/mc/mc0/rank9/dimm_edac_mode:S4ECD4ED

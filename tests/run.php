@@ -2,7 +2,8 @@
 /* Model tests on synthetic fixtures (tests/fixtures, written by tests/make_fixtures.py): php tests/run.php
  * Loads each fixture through topo_load(), checks the model and the problems list, exercises acknowledgements
  * against a temporary store (never the flash drive), anonymises a fixture and loads it again, and renders the
- * storage page from each fixture with E_ALL. Exits 1 on any failure.
+ * storage page from each fixture with E_ALL. The PCI Topology model and page are tested on a real, anonymised
+ * collection (tests/pci-fixtures) and variants of it. Exits 1 on any failure.
  */
 error_reporting(E_ALL);
 set_error_handler(function ($no, $str, $file, $line) {
@@ -683,7 +684,7 @@ foreach (glob("$docroot/plugins/storage-topology/scripts/*.sh") as $f) { file_pu
 function render(string $d): array {
   global $docroot;
   $cmd = 'ST_TOPO_CACHE=' . escapeshellarg($d) . ' ST_ACK_FILE=' . escapeshellarg(ST_ACK_FILE) . ' ST_LAYOUT_FILE=' . escapeshellarg(ST_LAYOUT_FILE) . ' '
-       . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/render.php') . ' ' . escapeshellarg($docroot) . ' StorageTopology.page';
+       . escapeshellarg(PHP_BINARY) . ' -d short_open_tag=1 ' . escapeshellarg(__DIR__ . '/render.php') . ' ' . escapeshellarg($docroot) . ' StorageTopology.page';
   $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
   $html = stream_get_contents($pipes[1]); $err = stream_get_contents($pipes[2]);
   proc_close($p);
@@ -725,6 +726,183 @@ foreach (glob("$fx/*", GLOB_ONLYDIR) as $d) {
     @unlink(ST_LAYOUT_FILE);
   }
 }
+
+// ---------------------------------------------------------------------------------------------------------
+$section = 'pci';
+// PCI Topology on a real collection (Threadripper PRO 5995WX on WRX80, anonymised: tests/make_pci_fixture.php).
+require_once "$plug/include/pci.php";
+$pfx = __DIR__ . '/pci-fixtures/wrx80-5995wx';
+function pload(string $dir): array { $m = pci_load($dir); st_acks_apply($m, 'pci'); return $m; }
+// A copy of the fixture with $edit(dir) applied: each file can be rewritten with pedit().
+function pvariant(string $name, callable $edit): string {
+  global $tmp, $pfx;
+  $d = "$tmp/pci-$name";
+  copy_dir($pfx, $d);
+  $edit($d);
+  return $d;
+}
+function pedit(string $d, string $file, callable $f): void { file_put_contents("$d/$file", $f((string)file_get_contents("$d/$file"))); }
+function pkeys(array $m, string $prefix): array { return array_values(array_filter($m['problems'], fn($p) => str_starts_with($p['key'], $prefix))); }
+
+$m = pload($pfx);
+$dev = $m['devices'];
+t(count($dev) === 121 && count($m['roots']) === 4 && array_keys($m['roots']) === ['0000:00', '0000:20', '0000:40', '0000:60'], '121 functions under 4 root complexes: ' . count($dev) . ' ' . implode(',', array_keys($m['roots'])));
+t($m['acs_override'] === 'downstream', 'pcie_acs_override seen on the command line');
+t(!str_contains((string)file_get_contents("$pfx/cmdline.txt"), 'unraiduuid=') || str_contains((string)file_get_contents("$pfx/cmdline.txt"), 'unraiduuid=(removed)'), 'fixture: unraiduuid removed');
+t(!preg_match('/Serial Number: (?!SN\d{4}|Unknown|Not Specified)/', (string)file_get_contents("$pfx/dmidecode.txt")), 'fixture: dmidecode serials anonymised');
+// CPU: 1 socket, NPS1, 8 CCDs with one CCX and 32 MiB L3 each; CCD1 isolated.
+$cpu = $m['cpu'];
+t($cpu['sockets'] === 1 && $cpu['cores'] === 64 && $cpu['count'] === 128 && count($cpu['nodes']) === 1 && $cpu['nps'] === 'NPS1', 'TR PRO 5995WX: 1 socket, 64/128, NPS1: ' . $cpu['nps']);
+t(count($cpu['ccds'][0]) === 8 && $cpu['ccx_per_ccd'] === 1 && pci_cpulist($cpu['ccds'][0][1]['ccx'][0]['cpus']) === '8-15,72-79', 'eight CCDs, CCD 1 = CPUs 8-15,72-79');
+t(pci_cpulist($cpu['isolated']) === '8-15,72-79' && $cpu['iso_flags'] === [], 'isolcpus 8-15,72-79 without flags');
+// The HighPoint card: a Broadcom PEX880xx switch behind root port 20:01.1 with eight NVMe ports and a management endpoint.
+$sw = $dev['0000:21:00.0'];
+$ports = array_filter($sw['children'], fn($c) => $dev[$c]['role'] === 'switch port');
+t($sw['role'] === 'switch upstream' && $sw['link']['cur_width'] === 16 && count($ports) >= 8, 'PEX880xx: upstream x16 with ' . count($ports) . ' downstream ports');
+t($dev['0000:22:00.0']['link'] === null, 'no link judged between a switch upstream port and its downstream ports (internal bus)');
+t($dev['0000:24:00.0']['link']['port'] === '0000:22:01.0' && $dev['0000:24:00.0']['vms'] === ['Windows 11'] && $dev['0000:24:00.0']['driver'] === 'vfio-pci', 'SN850X behind the switch: its port, vfio-pci, Windows 11');
+t($dev['0000:01:00.1']['link'] === ['shared' => '0000:01:00.0'], "the 4090's audio function shares the GPU's link");
+t($dev['0000:01:00.0']['rebar'][1]['current'] === '32GB' && $dev['0000:41:00.0']['sriov'] === ['total' => 8, 'num' => 0], 'ReBAR 32GB on the 4090; SR-IOV 0/8 on the ConnectX-6 Dx');
+t($dev['0000:60:01.1']['role'] === 'root port' && !$dev['0000:60:01.1']['children'] && $dev['0000:60:01.1']['link'] === null, 'empty hotplug port 60:01.1');
+t(count($m['groups']) === 100 && in_array('0000:01:00.1', $m['groups'][$dev['0000:01:00.0']['group']], true), 'IOMMU groups: 4090 and its audio function together');
+// Problems: the two Aquantia links at Gen3 of Gen4 (warn), the idle 3070 (info), interrupts on isolated CPUs (info).
+$links = pkeys($m, 'link|');
+t(count($links) === 3, 'three link problems: ' . dump_problems($m));
+t(count(array_filter($links, fn($p) => $p['level'] === 'warn' && preg_match('/^Link to 0000:d[56]:00\.0 \(Aquantia .* runs at Gen3 x2, but both ends support Gen4 x2 \(2\.0 of 3\.9 GB\/s\)/', $p['text']))) === 2, 'Aquantia d5/d6: Gen3 x2 of Gen4 x2, warn');
+t(count(matching($m, '/^Link to 0000:42:00\.0 \(NVIDIA .*3070.*\) runs at Gen1 x16, below Gen4 x16 .*Graphics cards lower their link speed when idle/', 'info')) === 1, 'idle 3070: info, not a warning');
+$irq = pkeys($m, 'irq-isolated');
+t(count($irq) === 1 && $irq[0]['level'] === 'info' && str_contains($irq[0]['text'], '(megaraid_sas, nvme x9) handle interrupts on isolated CPUs 8-15,72-79') && str_contains($irq[0]['text'], 'managed_irq'), 'IRQs on isolated CPUs grouped by driver: ' . ($irq[0]['text'] ?? ''));
+t(count($m['problems']) === 4 && $m['level'] === 'warn', 'nothing else flagged on this host: ' . dump_problems($m));
+// Memory: 8 channels A-H, one 64 GiB RDIMM each, paired with EDAC channels 0-7; 64 x 1G hugepages, Windows 11 uses 32.
+$mem = $m['mem'];
+t(count($mem['channels']) === 8 && $mem['total'] === 512 << 30 && $mem['edac_mapped'] && array_column(array_column($mem['channels'], 'edac'), 'channel') === range(0, 7), '8 channels, 512 GiB, EDAC channels 0-7 paired in order');
+t($m['huge'][1048576]['total'] === 64 && $m['vms']['Windows 11']['huge_kib'] === 1048576 && $m['vms']['Windows 11']['mem_kib'] === 32 << 20, '1G hugepages: 64 reserved, Windows 11 uses 32 GiB of them');
+t(!$m['vms']['Windows 11']['running'] && $m['vms']['Ubuntu']['running'] && pci_cpulist(pci_cpus(implode(',', $m['vms']['Ubuntu']['pins']))) === '16-19,80-83', 'VM state and pinning');
+
+// Acknowledge the Aquantia links: they leave the list; if the link changes (Gen2), they return.
+foreach ($links as $p) if ($p['level'] === 'warn') t(st_acks_write('pci', $p['id'], ['fp' => $p['fp'], 'text' => $p['text']]), 'pci ack written');
+$m2 = pload($pfx);
+t(count($m2['acked']) === 2 && !pkeys($m2, 'link|0000:d') && $m2['level'] === 'info', 'acknowledged links leave the list, status info: ' . $m2['level']);
+$d = pvariant('gen2', fn($d) => pedit($d, 'pciattr.txt', fn($s) => str_replace('0000:d5:00.0/current_link_speed:8.0 GT/s PCIe', '0000:d5:00.0/current_link_speed:5.0 GT/s PCIe', $s)));
+$m2 = pload($d);
+$p = pkeys($m2, 'link|0000:d5');
+t(count($p) === 1 && $p[0]['stale'] && str_contains($p[0]['text'], 'runs at Gen2 x2'), 'd5 at Gen2: acknowledgement lapses');
+$m2 = load("$fx/it-mode-sas3224");
+t(count($m2['acked']) === 0, 'pci acknowledgements do not touch the storage page');
+@unlink(ST_ACK_FILE);
+
+// Synthetic variants of the same host.
+// ECC: corrected errors on one rank, an uncorrectable on another.
+$d = pvariant('ecc', function ($d) { pedit($d, 'edac.txt', fn($s) => str_replace(['mc0/rank2/dimm_ce_count:0', 'mc0/rank5/dimm_ue_count:0'], ['mc0/rank2/dimm_ce_count:7', 'mc0/rank5/dimm_ue_count:1'], $s)); });
+$m2 = pload($d);
+$ce = pkeys($m2, 'ecc-ce|'); $ue = pkeys($m2, 'ecc-ue|');
+t(count($ce) === 1 && $ce[0]['level'] === 'warn' && str_starts_with($ce[0]['text'], 'Memory: 7 corrected ECC errors on ') && count($ue) === 1 && $ue[0]['level'] === 'crit' && $m2['level'] === 'crit',
+  'ECC: 7 corrected (warn) and 1 uncorrectable (crit): ' . dump_problems($m2));
+t((bool)preg_match('/channel [A-H]/', $ce[0]['text'] ?? ''), 'ECC errors name the board channel letter: ' . ($ce[0]['text'] ?? ''));
+// Population: channel H empty, channel G with a 32 GiB DIMM, one DIMM at 2933 of 3200.
+$d = pvariant('unbalanced', function ($d) {
+  pedit($d, 'dmidecode.txt', function ($s) {
+    $blocks = explode("\n\n", $s);
+    foreach ($blocks as &$b) {
+      if (str_contains($b, 'Bank Locator: P0 CHANNEL H')) $b = preg_replace(['/\tSize: 64 GiB/', '/\tSpeed: .*/', '/\tConfigured Memory Speed: .*/'], ["\tSize: No Module Installed", "\tSpeed: Unknown", "\tConfigured Memory Speed: Unknown"], $b);
+      if (str_contains($b, 'Bank Locator: P0 CHANNEL G')) $b = str_replace("\tSize: 64 GiB", "\tSize: 32 GiB", $b);
+      if (str_contains($b, 'Bank Locator: P0 CHANNEL A')) $b = str_replace("\tConfigured Memory Speed: 3200 MT/s", "\tConfigured Memory Speed: 2933 MT/s", $b);
+    }
+    return implode("\n\n", $blocks);
+  });
+});
+$m2 = pload($d);
+t(count(matching($m2, '/^Memory only 7 of 8 channels have a DIMM \(H empty\)/', 'warn')) === 1, 'channel H empty: warn: ' . dump_problems($m2));
+t(count(matching($m2, '/^Memory channels hold different amounts \(.*G 32 GiB.*\)/', 'warn')) === 1, 'channel G with less memory: unbalanced');
+t(count(matching($m2, '/^Memory runs at 2933 of 3200 MT\/s rated \(1 of 7 DIMMs\)/', 'info')) === 1, 'one DIMM below its rated speed: info');
+t(!$m2['mem']['edac_mapped'], 'EDAC not paired with letters when the populated channels differ');
+// Two NUMA nodes (NPS2-like): the 4090 on node 1, Windows 11 running on node 0 CPUs.
+$d = pvariant('numa', function ($d) {
+  pedit($d, 'nodes.txt', fn($s) => "node|0|0-31,64-95|263975426|10 12\nnode|1|32-63,96-127|263975426|12 10\nhuge|0|1048576kB|32|32|0\nhuge|1|1048576kB|32|32|0\nhuge|0|2048kB|0|0|0\nhuge|1|2048kB|0|0|0\n");
+  pedit($d, 'pciattr.txt', fn($s) => str_replace(['0000:01:00.0/numa_node:-1', '0000:01:00.1/numa_node:-1', '0000:02:00.0/numa_node:-1', '0000:20:01.1/numa_node:-1'],
+    ['0000:01:00.0/numa_node:1', '0000:01:00.1/numa_node:1', '0000:02:00.0/numa_node:1', '0000:20:01.1/numa_node:1'], $s));
+  pedit($d, 'vms.txt', fn($s) => str_replace('vm|Windows 11|0|', 'vm|Windows 11|1|', $s));
+});
+$m2 = pload($d);
+t(count($m2['cpu']['nodes']) === 2 && $m2['cpu']['nps'] === 'NPS2', 'two nodes over 8 L3 caches: NPS2: ' . $m2['cpu']['nps']);
+$vn = pkeys($m2, 'vm-numa|Windows 11|');
+t(count($vn) === 2 && $vn[0]['level'] === 'warn' && str_contains($vn[0]['text'], 'on NUMA node 1, but its vCPUs are pinned to node(s) 0'), 'VM on node 0 with its GPU on node 1: warn: ' . dump_problems($m2));
+t(count(pkeys($m2, 'numa-irq|0000:20:01.1')) === 1 && !pkeys($m2, 'numa-irq|0000:02:00.0'), 'root port on node 1 with its interrupt on CPU 23 (node 0) flagged; the MegaRAID, with queues on both nodes, not: ' . dump_problems($m2));
+// VMs: a passthrough device bound to nvme while the VM runs, a missing hostdev, too few hugepages, two VMs on the same
+// CPUs, a VM spread over two CCDs, and AER counters.
+$d = pvariant('vms', function ($d) {
+  pedit($d, 'vms.txt', fn($s) => str_replace(['vm|Windows 11|0|', "pin|k3s-ag-2|0|20\n", "pin|Ubuntu|1|80\n"], ['vm|Windows 11|1|', "pin|k3s-ag-2|0|16\n", "pin|Ubuntu|1|30\n"], $s) . "hostdev|Windows 11|0000:99:00.0\n");
+  pedit($d, 'pcilinks.txt', fn($s) => str_replace('0000:24:00.0|driver|../../../../../../bus/pci/drivers/vfio-pci', '0000:24:00.0|driver|../../../../../../bus/pci/drivers/nvme', $s));
+  pedit($d, 'nodes.txt', fn($s) => str_replace('huge|0|1048576kB|64|64|0', 'huge|0|1048576kB|16|16|0', $s));
+  pedit($d, 'pciattr.txt', fn($s) => str_replace(['0000:23:00.0/aer_dev_correctable:TOTAL_ERR_COR 0', '0000:23:00.0/aer_dev_correctable:RxErr 0', '0000:23:00.0/aer_dev_fatal:TOTAL_ERR_FATAL 0'],
+    ['0000:23:00.0/aer_dev_correctable:TOTAL_ERR_COR 12', '0000:23:00.0/aer_dev_correctable:RxErr 12', '0000:23:00.0/aer_dev_fatal:TOTAL_ERR_FATAL 1'], $s));
+});
+$m2 = pload($d);
+t(count(matching($m2, '/^VM "Windows 11" is running, but its passthrough device 0000:24:00\.0 .* is bound to nvme, not vfio-pci\./', 'warn')) === 1, 'running VM, device on nvme: warn: ' . dump_problems($m2));
+t(count(matching($m2, '/^VM "Windows 11" passes through 0000:99:00\.0, which is not in this system/', 'warn')) === 1, 'missing hostdev: warn');
+t(count(matching($m2, '/^VM "Windows 11" uses 1 GiB hugepages for 32 GiB \(32 pages\), but only 16 are reserved/', 'warn')) === 1, 'too few hugepages: warn');
+t(count(matching($m2, '/^Running VMs "k3s-ag-2" and "Ubuntu" have vCPUs pinned to the same CPUs 16\./', 'info')) === 1, 'overlapping pins: info');
+t(count(matching($m2, '/^VM "Ubuntu" has its vCPUs on 2 L3 caches/', 'info')) === 1, 'VM over two CCDs: info');
+t(count(matching($m2, '/^0000:23:00\.0 .*: 12 corrected PCIe errors since boot \(RxErr 12\)/', 'info')) === 1 && count(matching($m2, '/^0000:23:00\.0 .*: 1 fatal PCIe error since boot/', 'crit')) === 1,
+  'AER: corrected info, fatal crit: ' . dump_problems($m2));
+
+// libvirt XML: only names, pinning, memory, hugepages and PCI hostdevs come out; nothing else of the XML.
+$xml = <<<XML
+<domstatus state='running'><domain type='kvm' id='3'>
+  <name>Gaming VM</name><uuid>0b0c0d0e-1111-2222-3333-444455556666</uuid>
+  <memory unit='GiB'>16</memory><vcpu placement='static'>4</vcpu>
+  <memoryBacking><hugepages><page size='1048576' unit='KiB'/></hugepages></memoryBacking>
+  <cputune><vcpupin vcpu='0' cpuset='8'/><vcpupin vcpu='1' cpuset='72'/><emulatorpin cpuset='2,66'/></cputune>
+  <numatune><memory mode='strict' nodeset='0'/></numatune>
+  <devices>
+    <disk type='file'><source file='/mnt/user/domains/secret-name/vdisk1.img'/></disk>
+    <interface type='bridge'><mac address='52:54:00:12:34:56'/></interface>
+    <graphics type='vnc' passwd='hunter2'/>
+    <hostdev mode='subsystem' type='pci' managed='yes'><source><address domain='0x0000' bus='0x0a' slot='0x00' function='0x1'/></source></hostdev>
+    <hostdev mode='subsystem' type='usb'><source><vendor id='0x1234'/></source></hostdev>
+  </devices>
+</domain></domstatus>
+XML;
+$vm = pci_vm_parse($xml);
+t($vm !== null && $vm['name'] === 'Gaming VM' && $vm['mem_kib'] === 16 << 20 && $vm['huge_kib'] === 1048576 && $vm['pins'] === [0 => '8', 1 => '72'] && $vm['emu'] === '2,66'
+  && $vm['numa'] === '0' && $vm['hostdevs'] === ['0000:0a:00.1'], 'live (domstatus) XML parsed: ' . json_encode($vm));
+$lines = implode("\n", pci_vm_lines($vm, true));
+t(!preg_match('/hunter2|52:54:00|secret-name|0b0c0d0e|vdisk/', $lines), 'VM lines carry no disks, MACs, passwords or UUIDs');
+$vms = pci_parse_vms(explode("\n", $lines));
+t(isset($vms['Gaming VM']) && $vms['Gaming VM']['running'] && $vms['Gaming VM']['hostdevs'] === ['0000:0a:00.1'] && $vms['Gaming VM']['huge_kib'] === 1048576, 'VM lines read back');
+t(pci_vm_parse('<domain><name>x</name><memory>1048576</memory><memoryBacking><hugepages/></memoryBacking></domain>')['huge_kib'] === 0 && pci_vm_parse('not xml') === null, 'hugepages without a size; broken XML ignored');
+// The anonymiser removes the licence GUID from the kernel command line and DIMM serials from dmidecode.
+$st = st_anon_new([], 0);
+$dmi = "Memory Device\n\tSerial Number: 4A3B2C1D\n\tAsset Tag: AT-0099123\n";
+st_anon_scan($st, 'dmidecode.txt', $dmi);
+$out = st_anon_text($st, 'dmidecode.txt', $dmi) . st_anon_text($st, 'cmdline.txt', 'BOOT_IMAGE=/bzimage unraiduuid=1234abcd-5678 isolcpus=8-15');
+t(!str_contains($out, '4A3B2C1D') && !str_contains($out, 'AT-0099123') && str_contains($out, 'unraiduuid=(removed) isolcpus=8-15'), 'anonymiser: DIMM serial, asset tag, unraiduuid: ' . $out);
+
+// Render the PCI page from the fixture and from the variants (E_ALL clean).
+function render_pci(string $d): array {
+  global $docroot;
+  $cmd = 'ST_PCI_DIR=' . escapeshellarg($d) . ' ST_ACK_FILE=' . escapeshellarg(ST_ACK_FILE) . ' '
+       . escapeshellarg(PHP_BINARY) . ' -d short_open_tag=1 ' . escapeshellarg(__DIR__ . '/render.php') . ' ' . escapeshellarg($docroot) . ' PciTopology.page';
+  $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+  $html = stream_get_contents($pipes[1]); $err = stream_get_contents($pipes[2]);
+  proc_close($p);
+  return [$html, $err];
+}
+[$html, $err] = render_pci($pfx);
+t($err === '', "pci page renders without notices: $err");
+t(str_contains($html, 'AMD Ryzen Threadripper PRO 5995WX') && substr_count($html, '<b>CCD ') === 8 && str_contains($html, '<b>ACS override is on</b>'), 'pci page: CPU, 8 CCDs, ACS override banner');
+t(str_contains($html, '21:00.0</span>Broadcom PEX880xx') && str_contains($html, '>8 ports, 32:16 lanes</span>') && str_contains($html, '(2.0:1 oversubscribed when every port is busy at once)')
+  && str_contains($html, '>3 ports, 6:8 lanes</span>'), 'pci page: switch fan-out without its internal ports (management endpoint, chipset SATA/USB)');
+t(str_contains($html, '>VM Windows 11</span>') && str_contains($html, 'empty (max Gen4 x4)') && str_contains($html, 'Windows 11 (32 GiB, stopped)'), 'pci page: passthrough, empty port, hugepage user');
+t(str_contains($html, "data-space='pci'") || str_contains($html, 'data-space="pci"') || str_contains($html, "'pci'"), 'pci page: problems posted to the pci ack space');
+t(!str_contains($html, 'Collector exit'), 'stub collector: no collector warning');
+foreach (['ecc', 'unbalanced', 'numa', 'vms'] as $v) {
+  [$html, $err] = render_pci("$tmp/pci-$v");
+  t($err === '' && str_contains($html, '</table>'), "pci page renders the $v variant: $err");
+  if ($v === 'numa') t(str_contains($html, '<h4>NUMA nodes</h4>') && str_contains($html, '<th>NUMA</th>'), 'two nodes: node table and NUMA column');
+  if ($v === 'unbalanced') t(str_contains($html, '<h4>EDAC counters</h4>'), 'unpaired EDAC channels listed as EDAC reports them');
+}
+
 
 rm_dir($tmp);
 echo "tests: $passed passed, $failed failed\n";

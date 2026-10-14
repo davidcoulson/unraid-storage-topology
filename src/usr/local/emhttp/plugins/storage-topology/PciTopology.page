@@ -1,0 +1,317 @@
+Menu="SystemInformation"
+Title="PCI Topology"
+Icon="microchip"
+Tag="microchip"
+Markdown="false"
+---
+<?PHP
+/* PCI topology: root complexes -> root ports -> switches -> devices, with link speed/width at both ends, drivers,
+ * IOMMU groups, VM passthrough, SR-IOV, AER, ASPM and resizable BARs; CPU layout (sockets, NUMA nodes, CCDs/CCXs,
+ * isolated CPUs, VM pinning) and memory (channels, DIMMs, ECC counters, hugepages).
+ * Data: scripts/collect-pci.sh (read-only lspci/dmidecode/sysfs/proc, cached 60 s), parsed by include/pci.php.
+ */
+$em = "$docroot/plugins/storage-topology";
+require_once "$em/include/pci.php";
+require_once "$em/include/common.php";
+$maxAge = isset($_GET['refresh']) ? 5 : 60;
+exec("timeout 60 $em/scripts/collect-pci.sh $maxAge 2>&1", $out, $rc);
+$m = pci_load(getenv('ST_PCI_DIR') ?: PCI_CACHE);
+if ($rc !== 0) array_unshift($m['problems'], ['level' => 'warn', 'text' => "Collector exit $rc - showing the last good data." . ($out ? ' ' . implode(' ', $out) : ''), 'who' => '',
+                                              'key' => 'collector-exit', 'value' => (string)$rc]);
+st_acks_apply($m, 'pci');
+
+$h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+$chip = fn($level, $text, $title = '') => "<span class='st-chip st-$level'" . ($title !== '' ? " title='" . htmlspecialchars($title, ENT_QUOTES) . "'" : '') . ">$text</span>";
+$lvlText = ['ok' => 'Healthy', 'info' => 'Healthy (notes)', 'warn' => 'Warning', 'crit' => 'Critical'];
+$levelFor = fn(array $who) => pci_worst(array_column(array_filter($m['problems'], fn($p) => in_array($p['who'] ?? '', $who, true)), 'level'));
+$age = $m['collected'] ? time() - $m['collected'] : null;
+$cpu = $m['cpu'];
+$mem = $m['mem'];
+$dev = $m['devices'];
+$iso = array_flip($cpu['isolated'] ?? []);
+$multiNode = count($cpu['nodes'] ?? []) > 1;
+// Which VM each CPU is pinned to (running VMs first).
+$vmOf = [];
+foreach ($m['vms'] as $name => $vm) foreach ($vm['pins'] as $set) foreach (pci_cpus($set) as $c) $vmOf[$c][] = $name . ($vm['running'] ? '' : ' (stopped)');
+// Device interrupts per CPU (host drivers only).
+$irqsOn = [];
+foreach ($dev as $d) if ($d['driver'] !== 'vfio-pci') foreach ($d['irq_cpus'] as $c) $irqsOn[$c][] = $d['bdf'];
+$roleText = ['root port' => 'Root port', 'switch upstream' => 'Switch', 'switch port' => 'Switch port', 'host bridge' => 'Host bridge', 'bridge' => 'Bridge', 'endpoint' => ''];
+$name = fn($d) => preg_replace('/\s*\[[0-9a-f]{4}(:[0-9a-f]{4})?\]/', '', $d['short']);
+$linkCell = function ($d) use ($h, $chip, $dev) {
+  $l = $d['link'];
+  if ($l === null) return $d['max_speed'] !== null && !$d['children'] && in_array($d['role'], ['root port', 'switch port'], true)
+    ? "<span class='st-dim'>empty (max " . pci_link_text($d['max_speed'], $d['max_width']) . ')</span>' : '';
+  if (isset($l['shared'])) return "<span class='st-dim'>same link as " . $h(substr($l['shared'], 5)) . '</span>';
+  $lvl = $l['narrow'] ? 'warn' : ($l['slow'] ? (str_starts_with($d['class'], '0x03') || in_array($d['power'], ['D3hot', 'D3cold'], true) ? 'info' : 'warn') : 'ok');
+  $tip = sprintf("Current: %s GT/s x%s%s\nDevice supports: %s GT/s x%s\nPort %s supports: %s GT/s x%s", $l['cur_speed'], $l['cur_width'],
+    $l['gbs'] ? sprintf(' (%.1f GB/s)', $l['gbs']) : '', $l['dev_speed'], $l['dev_width'], $l['port'], $l['port_speed'], $l['port_width']);
+  return $chip($lvl, $h(pci_link_text($l['cur_speed'], $l['cur_width'])), $tip)
+    . " <span class='st-dim'>of " . $h(pci_link_text($l['exp_speed'], $l['exp_width'])) . '</span>'
+    . ($l['dev_speed'] != $l['port_speed'] || $l['dev_width'] != $l['port_width']
+      ? "<br><span class='st-dim' style='font-size:.85em'>dev " . $h(pci_link_text($l['dev_speed'], $l['dev_width'])) . ' / port ' . $h(pci_link_text($l['port_speed'], $l['port_width'])) . '</span>' : '');
+};
+$detailChips = function ($d) use ($h, $chip, $m, $dev) {
+  $out = [];
+  if ($d['slot'] !== '') $out[] = $chip('dim', 'slot ' . $h($d['slot']));
+  if ($d['vms']) foreach ($d['vms'] as $v) $out[] = $chip(($m['vms'][$v]['running'] ?? false) ? 'ok' : 'dim', 'VM ' . $h($v), ($m['vms'][$v]['running'] ?? false) ? 'Passed through to this running VM' : 'Passed through to this VM (stopped)');
+  elseif ($d['vfio_boot']) $out[] = $chip('dim', 'vfio at boot', 'Bound to vfio-pci at boot (System Devices, /boot/config/vfio-pci.cfg)');
+  if ($d['role'] === 'switch upstream' && $d['link'] && !isset($d['link']['shared'])) {
+    // Fan-out: lanes behind the switch against the lanes into it. Ports to the switch's own functions (a management
+    // endpoint, a chipset's SATA and USB controllers: same vendor as the switch) are internal and left out.
+    $down = array_filter(array_map(fn($c) => $dev[$c], $d['children']), fn($c) => $c['role'] === 'switch port'
+      && !array_filter($c['children'], fn($k) => $dev[$k]['vendor_id'] === $d['vendor_id']));
+    $lanes = array_sum(array_map(fn($c) => (int)$c['max_width'], $down));
+    $up = (int)$d['link']['exp_width'];
+    if ($lanes && $up) $out[] = $chip('dim', count($down) . ' ports, ' . $lanes . ':' . $up . ' lanes', count($down) . " downstream ports with $lanes lanes in all share the x$up link into the switch"
+      . ($lanes > $up ? sprintf(' (%.1f:1 oversubscribed when every port is busy at once)', $lanes / $up) : '') . '.');
+  }
+  if ($d['sriov']) $out[] = $chip($d['sriov']['num'] ? 'ok' : 'dim', "SR-IOV {$d['sriov']['num']}/{$d['sriov']['total']} VFs");
+  if ($d['physfn']) $out[] = $chip('dim', 'VF of ' . $h(substr($d['physfn'], 5)));
+  foreach ($d['rebar'] as $n => $r) if ($r['max_bytes'] && $r['max_bytes'] > 256 << 20) $out[] = $chip($r['cur_bytes'] >= $r['max_bytes'] ? 'ok' : 'dim', "ReBAR $n: " . $h($r['current']),
+    "Resizable BAR $n: " . $r['current'] . ' of up to ' . $r['max'] . ($r['cur_bytes'] < $r['max_bytes'] ? ' (not at its largest size: Above 4G decoding / Resizable BAR may be off in the BIOS, or the driver chose it)' : ''));
+  if ($d['aspm'] !== '' && $d['link'] && !isset($d['link']['shared'])) $out[] = $chip('dim', 'ASPM ' . $h(strtolower($d['aspm']) === 'disabled' ? 'off' : $d['aspm']), 'Active State Power Management. Link supports: ' . ($d['aspm_cap'] ?: '-')
+    . "\nThe kernel policy (pcie_aspm.policy) applies to all links.");
+  foreach (['fatal' => 'crit', 'nonfatal' => 'warn', 'cor' => 'info'] as $k => $lvl) if (($d['aer'][$k]['total'] ?? 0) > 0)
+    $out[] = $chip($lvl, 'AER ' . ['fatal' => 'fatal', 'nonfatal' => 'non-fatal', 'cor' => 'corrected'][$k] . ' ' . number_format($d['aer'][$k]['total']),
+      implode("\n", array_map(fn($n, $v) => "$n: $v", array_keys($d['aer'][$k]['detail']), $d['aer'][$k]['detail'])));
+  if ($d['lane_err'] !== '') $out[] = $chip('dim', 'lane errors', "The link's lane error status register has lanes " . $d['lane_err'] . " flagged (sticky, often set once during link training; not counted as a problem).");
+  if (in_array($d['power'], ['D3hot', 'D3cold'], true)) $out[] = $chip('dim', $h($d['power']), 'Device is in a low-power state');
+  if ($d['irqs']) $out[] = $chip('dim', count($d['irqs']) . ' IRQ' . (count($d['irqs']) === 1 ? '' : 's'), 'Interrupts handled on CPUs ' . (pci_cpulist($d['irq_cpus']) ?: '-'));
+  return implode(' ', $out);
+};
+// Tree rows, depth first. Filler host bridges (AMD "Dummy Host Bridge", data fabric) get a class the toggle hides.
+$rows = function (array $list, int $depth, string $prefix) use (&$rows, $dev): array {
+  $out = [];
+  $n = count($list);
+  foreach (array_values($list) as $i => $b) {
+    $d = $dev[$b];
+    $last = $i === $n - 1;
+    $out[] = ['d' => $d, 'depth' => $depth, 'tree' => $depth ? $prefix . ($last ? '└─ ' : '├─ ') : ''];
+    if ($d['children']) $out = array_merge($out, $rows($d['children'], $depth + 1, $depth ? $prefix . ($last ? '   ' : '│  ') : ''));
+  }
+  return $out;
+};
+?>
+<style>
+.st-wrap{max-width:1500px}
+.st-card{border:1px solid rgba(128,128,128,.3);border-radius:6px;padding:10px 14px;margin:12px 0}
+.st-card h3{margin:0 0 6px 0;font-size:1.15em;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.st-card h4{margin:12px 0 4px 0;font-size:1em;opacity:.85}
+table.st{width:100%;border-collapse:collapse;margin:4px 0}
+table.st th{text-align:left;padding:4px 8px;border-bottom:1px solid rgba(128,128,128,.4);white-space:nowrap;font-weight:600}
+table.st td{padding:3px 8px;border-bottom:1px solid rgba(128,128,128,.15);vertical-align:top}
+table.st td.num,table.st th.num{text-align:right;white-space:nowrap}
+.st-chip{display:inline-block;padding:1px 8px;border-radius:10px;font-size:.88em;white-space:nowrap;border:1px solid currentColor;margin:1px 0}
+.st-ok{color:#2e7d32}.st-info{color:#1e88e5}.st-warn{color:#e68a00}.st-crit{color:#d32f2f}.st-absent,.st-unknown,.st-dim{opacity:.55}
+.st-kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:2px 18px;font-size:.95em}
+.st-kv div span:first-child{opacity:.65;margin-right:6px}
+.st-problems{margin:6px 0 0 0;padding-left:18px}.st-problems li{margin:2px 0}
+.st-scroll{overflow-x:auto}
+.st-ack{margin-left:10px;font-size:.85em;opacity:.7}.st-acked{margin:4px 0 0 0}.st-acked summary{cursor:pointer}
+.st-tree{font-family:monospace;white-space:pre;opacity:.6}
+.st-bdf{font-family:monospace;font-size:.9em;opacity:.75;margin-right:6px}
+.st-ccds{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin:6px 0}
+.st-ccd{border:1px solid rgba(128,128,128,.35);border-radius:6px;padding:6px 8px}
+.st-ccd b{font-size:1em}
+.st-cores{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:5px}
+.st-core{border:1px solid rgba(128,128,128,.3);border-radius:4px;padding:1px 3px;font-size:.8em;text-align:center;line-height:1.25}
+.st-core.iso{border-color:#8e24aa;background:rgba(142,36,170,.12)}
+.st-core.vm{box-shadow:inset 0 -3px 0 #1e88e5}
+.st-legend span{margin-right:12px;font-size:.85em}
+.st-banner{border-left:3px solid #e68a00;padding:4px 10px;margin:6px 0;background:rgba(230,138,0,.07)}
+#st-pci.st-hidefill tr.fill{display:none}
+</style>
+<div class="st-wrap">
+<p>
+<?=$chip($m['level'] ?? 'ok', $lvlText[$m['level'] ?? 'ok'] ?? '')?>
+<span class="st-dim">Collected <?=$age === null ? 'never' : ($age < 5 ? 'just now' : "{$age} s ago")?>
+(<?=array_sum(array_column($m['timings'], 'ms'))?> ms, read-only lspci/dmidecode/sysfs, cached 60 s).</span>
+<a href="?refresh=1" style="margin-left:10px">Refresh</a>
+<a href="/Tools/StorageTopology" style="margin-left:10px">Storage Topology</a>
+<a href="/Tools/NetworkTopology" style="margin-left:10px">Network Topology</a>
+<?=st_diag_html()?>
+</p>
+<?=st_problems_html($m, 'pci')?>
+
+<?/* ------------------------------------------------------------------ CPU and NUMA */?>
+<div class="st-card">
+<h3><i class="fa fa-microchip"></i> <?=$h($cpu['model'] ?: 'CPU')?> <?=$chip($levelFor(['cpu']), $lvlText[$levelFor(['cpu'])])?></h3>
+<div class="st-kv">
+<div><span>Sockets</span><?=$cpu['sockets']?></div>
+<div><span>Cores / threads</span><?=$cpu['cores']?> / <?=$cpu['count']?></div>
+<div><span>NUMA nodes</span><?=count($cpu['nodes'])?><?=$cpu['nps'] !== '' ? ' &middot; ' . $h($cpu['nps']) : ''?></div>
+<div><span>L3 domains</span><?=array_sum(array_map('count', array_map(fn($l) => array_merge(...array_column($l, 'ccx')), $cpu['ccds'] ?: [[]]))) ?: '-'?> (<?=$cpu['ccx_per_ccd'] === 2 ? '2 CCX per CCD' : '1 CCX per CCD'?>)</div>
+<?foreach ($cpu['cache'] as $c):?><div><span>L<?=$h($c['level'] ?? '?')?> <?=$h(strtolower($c['type'] ?? ''))?></span><?=$h(isset($c['size']) ? pci_bytes_text(pci_size_bytes($c['size'])) : '-')?> per core</div><?endforeach;?>
+<div><span>Isolated CPUs</span><?=$cpu['isolated'] ? $h(pci_cpulist($cpu['isolated'])) . ($cpu['iso_flags'] ? ' (' . $h(implode(',', $cpu['iso_flags'])) . ')' : '') : 'none'?></div>
+<?if ($cpu['nohz_full']):?><div><span>nohz_full</span><?=$h(pci_cpulist($cpu['nohz_full']))?></div><?endif;?>
+<?foreach (['rcu_nocbs', 'irqaffinity', 'amd_pstate', 'iommu', 'amd_iommu', 'pcie_aspm', 'default_hugepagesz'] as $k) if (isset($m['cmdline'][$k])):?><div><span><?=$h($k)?></span><?=$h($m['cmdline'][$k])?></div><?endif;?>
+</div>
+<?if (!$multiNode):?><p class="st-dim" style="margin:6px 0 0 0">One NUMA node: every device and all memory are local to all CPUs, so there is no cross-node placement to get wrong. Within the node, what matters is the L3 cache: threads on different CCDs do not share it.</p><?endif;?>
+<?foreach ($cpu['ccds'] as $pkg => $ccds):?>
+<?if ($cpu['sockets'] > 1):?><h4>Socket <?=$pkg?></h4><?endif;?>
+<div class="st-ccds">
+<?foreach ($ccds as $ccd):?>
+<div class="st-ccd">
+<b>CCD <?=$ccd['ccd']?></b>
+<?foreach ($ccd['ccx'] as $x):
+  $cores = [];
+  foreach ($x['cpus'] as $c) $cores[$cpu['siblings'][$c] ?? $c][] = $c;
+  $isoN = count(array_intersect_key(array_flip($x['cpus']), $iso));
+  $irqN = array_sum(array_map(fn($c) => count($irqsOn[$c] ?? []), $x['cpus']));
+?>
+<div class="st-dim" style="font-size:.85em"><?=$cpu['ccx_per_ccd'] > 1 ? "CCX {$x['index']} &middot; " : ''?>L3 <?=$h(pci_bytes_text(pci_size_bytes($x['size'])))?> &middot; <?=$x['cores']?> cores &middot; CPUs <?=$h(pci_cpulist($x['cpus']))?><?=$multiNode ? ' &middot; node ' . $h(implode(',', $x['nodes'])) : ''?><?=$irqN ? " &middot; $irqN device IRQ" . ($irqN === 1 ? '' : 's') : ''?></div>
+<div class="st-cores">
+<?foreach ($cores as $core => $threads):
+  $isIso = count(array_intersect($threads, array_keys($iso))) > 0;
+  $vms = array_unique(array_merge(...array_map(fn($c) => $vmOf[$c] ?? [], $threads)));
+  $irq = array_sum(array_map(fn($c) => count($irqsOn[$c] ?? []), $threads));
+  $tip = "Core $core: CPUs " . implode(', ', $threads) . ($isIso ? "\nIsolated" : '') . ($vms ? "\nPinned: " . implode(', ', $vms) : '') . ($irq ? "\n$irq device interrupts" : '');
+?><div class="st-core<?=$isIso ? ' iso' : ''?><?=$vms ? ' vm' : ''?>" title="<?=$h($tip)?>"><?=$h(implode('/', $threads))?></div><?endforeach;?>
+</div>
+<?endforeach;?>
+</div>
+<?endforeach;?>
+</div>
+<?endforeach;?>
+<div class="st-legend st-dim"><span><span class="st-core iso" style="display:inline-block">&nbsp;</span> isolated</span><span><span class="st-core vm" style="display:inline-block">&nbsp;</span> pinned to a VM</span><span>Each box is a core: its two CPU (thread) numbers. Hover for details.<?=$cpu['ccx_per_ccd'] === 1 && ($cpu['vendor'] ?? '') === 'AuthenticAMD' ? ' CCDs are numbered from the L3 caches (one per CCD on Zen 3 and later).' : ''?></span></div>
+
+<?if ($multiNode):?>
+<h4>NUMA nodes</h4>
+<table class="st"><tr><th>Node</th><th>CPUs</th><th class="num">Memory</th><th>Distances</th><th>Devices</th></tr>
+<?foreach ($cpu['nodes'] as $n):?>
+<tr><td><?=$n['node']?></td><td><?=$h(pci_cpulist($n['cpus']))?></td><td class="num"><?=$h(pci_bytes_text($n['mem_kib'] * 1024))?></td><td><?=$h($n['distance'])?></td>
+<td><?=count(array_filter($dev, fn($d) => $d['numa'] === $n['node'] && $d['role'] === 'endpoint'))?></td></tr>
+<?endforeach;?>
+</table>
+<?endif;?>
+
+<?if ($m['vms']):?>
+<h4>VMs</h4>
+<div class="st-scroll"><table class="st">
+<tr><th>VM</th><th>State</th><th class="num">vCPUs</th><th>Pinned to</th><th>CCDs</th><th>Emulator</th><th class="num">Memory</th><th>Hugepages</th><th>Passthrough</th></tr>
+<?foreach ($m['vms'] as $vname => $vm):
+  $pins = [];
+  foreach ($vm['pins'] as $set) $pins = array_merge($pins, pci_cpus($set));
+  $ccdsOf = array_unique(array_map(fn($c) => isset($cpu['l3_of'][$c]) ? ($cpu['sockets'] > 1 ? $cpu['l3_of'][$c]['package'] . ':' : '') . $cpu['l3_of'][$c]['ccd'] : '?', $pins));
+  sort($ccdsOf);
+  $isoPins = count(array_intersect($pins, array_keys($iso)));
+  $vl = $levelFor(array_merge(["vm:$vname"], $vm['hostdevs']));
+?>
+<tr><td><b><?=$h($vname)?></b></td><td><?=$chip($vm['running'] ? 'ok' : 'dim', $vm['running'] ? 'running' : 'stopped')?></td><td class="num"><?=$vm['vcpus']?></td>
+<td><?=$pins ? $h(pci_cpulist($pins)) . ($cpu['isolated'] ? " <span class='st-dim'>(" . ($isoPins === count($pins) ? 'all isolated' : ($isoPins ? "$isoPins isolated" : 'not isolated')) . ')</span>' : '') : "<span class='st-dim'>not pinned</span>"?></td>
+<td><?=$pins ? $h(implode(', ', $ccdsOf)) : '-'?></td><td><?=$h($vm['emu'] ?: '-')?></td><td class="num"><?=$h(pci_bytes_text($vm['mem_kib'] * 1024))?></td>
+<td><?=$vm['huge_kib'] === null ? "<span class='st-dim'>no</span>" : $h(pci_bytes_text(($vm['huge_kib'] ?: (int)($m['meminfo']['Hugepagesize'] ?? 2048)) * 1024)) . ' pages'?></td>
+<td><?=implode('<br>', array_map(fn($b) => isset($dev[$b]) ? "<span class='st-bdf'>" . $h(substr($b, 5)) . '</span>' . $h($name($dev[$b])) . ' ' . $chip($dev[$b]['driver'] === 'vfio-pci' ? 'ok' : ($vm['running'] ? 'warn' : 'dim'), $h($dev[$b]['driver'] ?: 'no driver'))
+  : "<span class='st-warn'>" . $h($b) . ' (not present)</span>', $vm['hostdevs'])) ?: '-'?></td></tr>
+<?endforeach;?>
+</table></div>
+<?endif;?>
+</div>
+
+<?/* ------------------------------------------------------------------ Memory */?>
+<div class="st-card">
+<h3><i class="fa fa-database"></i> Memory <?=$h(pci_bytes_text($mem['total'] ?: null))?> <?=$chip($levelFor(['mem']), $lvlText[$levelFor(['mem'])])?></h3>
+<div class="st-kv">
+<?if ($mem['array']):?>
+<div><span>Error correction</span><?=$h($mem['array']['Error Correction Type'] ?? '-')?></div>
+<div><span>Board maximum</span><?=$h($mem['array']['Maximum Capacity'] ?? '-')?> in <?=$h($mem['array']['Number Of Devices'] ?? '?')?> slots</div>
+<?endif;?>
+<div><span>Channels populated</span><?=count(array_filter($mem['channels'], fn($c) => $c['populated'] > 0))?> of <?=count($mem['channels'])?></div>
+<?foreach ($mem['edac'] as $mc):?><div><span>EDAC mc<?=$mc['mc']?></span><?=$h($mc['name'])?>: <?=number_format($mc['ce'])?> corrected, <?=number_format($mc['ue'])?> uncorrectable<?=$mc['since'] !== null ? ' in ' . $h(pci_duration($mc['since'])) : ''?></div><?endforeach;?>
+<?if (!$mem['edac']):?><div><span>EDAC</span>not loaded (no ECC counters)</div><?endif;?>
+</div>
+<?if ($mem['channels']):?>
+<div class="st-scroll"><table class="st">
+<tr><th>Channel</th><th>Slot</th><th class="num">Size</th><th>Module</th><th>Type</th><th class="num">Rank</th><th class="num">Speed (MT/s)</th><th class="num">ECC corrected</th><th class="num">Uncorrectable</th></tr>
+<?foreach ($mem['channels'] as $c): $first = true; foreach ($c['dimms'] as $x):
+  $e = $c['edac'];
+  $spd = $x['configured'] && $x['rated'] && $x['configured'] < $x['rated'] ? 'info' : 'ok';
+?>
+<tr<?=$x['present'] ? '' : " class='st-dim'"?>>
+<?if ($first):?><td rowspan="<?=count($c['dimms'])?>"><b><?=$h(count(array_unique(array_column($mem['channels'], 'socket'))) > 1 ? "P{$c['socket']} " : '')?><?=$h($c['channel'])?></b><?=$e ? "<br><span class='st-dim' style='font-size:.85em' title='EDAC numbers channels by memory controller (UMC), the board by letter. They were paired in order because the populated channels match in number and size; the board manual has the authoritative mapping.'>EDAC ch {$e['channel']}*</span>" : ''?></td><?endif;?>
+<td><?=$h($x['locator'])?></td>
+<?if ($x['present']):?>
+<td class="num"><?=$h(pci_bytes_text($x['bytes']))?></td><td title="<?=$h($x['serial'] !== '' ? "Serial $x[serial]" : '')?>"><?=$h(trim($x['vendor'] . ' ' . $x['part']))?></td>
+<td><?=$h(trim($x['type'] . ' ' . (preg_match('/Registered|Unbuffered|LRDIMM|Load Reduced/i', $x['detail'], $mm) ? $mm[0] : '')))?></td><td class="num"><?=$h($x['rank'] ?: '-')?></td>
+<td class="num"><?=$x['configured'] || $x['rated'] ? $chip($spd, $h(($x['configured'] ?: '?') . ' / ' . ($x['rated'] ?: '?')), 'configured / rated') : '-'?></td>
+<?else:?><td colspan="5">empty</td><?endif;?>
+<?if ($first):?>
+<td class="num" rowspan="<?=count($c['dimms'])?>"><?=$e ? $chip($e['ce'] ? 'warn' : 'ok', number_format($e['ce'])) : '-'?></td>
+<td class="num" rowspan="<?=count($c['dimms'])?>"><?=$e ? $chip($e['ue'] ? 'crit' : 'ok', number_format($e['ue'])) : '-'?></td>
+<?endif;?>
+</tr>
+<?$first = false; endforeach; endforeach;?>
+</table></div>
+<?if ($mem['edac'] && !$mem['edac_mapped']):?>
+<h4>EDAC counters</h4>
+<p class="st-dim" style="margin:0">The EDAC channels could not be paired with the board's channel letters (their number or sizes differ), so they are listed as EDAC reports them.</p>
+<table class="st"><tr><th>Controller</th><th>Channel</th><th class="num">Ranks</th><th class="num">Size</th><th class="num">Corrected</th><th class="num">Uncorrectable</th></tr>
+<?foreach ($mem['edac'] as $mc) foreach ($mc['channels'] as $c):?>
+<tr><td>mc<?=$mc['mc']?></td><td><?=$c['channel']?><?=$c['label'] !== '' ? ' (' . $h($c['label']) . ')' : ''?></td><td class="num"><?=$c['ranks']?></td><td class="num"><?=$h(pci_bytes_text($c['size_mb'] * 1048576))?></td>
+<td class="num"><?=$chip($c['ce'] ? 'warn' : 'ok', number_format($c['ce']))?></td><td class="num"><?=$chip($c['ue'] ? 'crit' : 'ok', number_format($c['ue']))?></td></tr>
+<?endforeach;?>
+</table>
+<?elseif ($mem['edac_mapped']):?>
+<p class="st-dim" style="margin:4px 0 0 0">* EDAC channel numbers are paired with the board's channel letters in order (they match in number and size); check the board manual if an error is reported.</p>
+<?endif;?>
+<?else:?>
+<p class="st-dim">dmidecode reported no memory devices.</p>
+<?endif;?>
+
+<h4>Hugepages</h4>
+<table class="st"><tr><th>Page size</th><th class="num">Reserved</th><th class="num">Free</th><th class="num">Total</th><th>Used by VMs</th><?if ($multiNode):?><th>Per node (free/total)</th><?endif;?></tr>
+<?foreach ($m['huge'] as $kb => $hp):
+  $users = array_filter($m['vms'], fn($vm) => $vm['huge_kib'] !== null && ($vm['huge_kib'] ?: (int)($m['meminfo']['Hugepagesize'] ?? 2048)) === $kb);
+?>
+<tr<?=$hp['total'] ? '' : " class='st-dim'"?>><td><?=$h(pci_bytes_text($kb * 1024))?></td><td class="num"><?=number_format($hp['total'])?></td><td class="num"><?=number_format($hp['free'])?></td>
+<td class="num"><?=$h(pci_bytes_text($hp['total'] * $kb * 1024))?></td>
+<td><?=implode(', ', array_map(fn($vm) => $h($vm['name']) . ' (' . $h(pci_bytes_text($vm['mem_kib'] * 1024)) . ', ' . ($vm['running'] ? 'running' : 'stopped') . ')', $users)) ?: '-'?></td>
+<?if ($multiNode):?><td><?=$h(implode(', ', array_map(fn($n, $x) => "node $n: {$x['free']}/{$x['total']}", array_keys($hp['nodes']), $hp['nodes'])))?></td><?endif;?></tr>
+<?endforeach;?>
+</table>
+<?if (isset($m['cmdline']['hugepages']) || isset($m['cmdline']['hugepagesz'])):?><p class="st-dim" style="margin:2px 0 0 0">Reserved at boot: <code><?=$h(trim(implode(' ', array_map(fn($k) => isset($m['cmdline'][$k]) ? "$k={$m['cmdline'][$k]}" : '', ['default_hugepagesz', 'hugepagesz', 'hugepages']))))?></code></p><?endif;?>
+</div>
+
+<?/* ------------------------------------------------------------------ PCI tree */?>
+<div class="st-card" id="st-pci">
+<h3><i class="fa fa-sitemap"></i> PCI devices <span class="st-dim"><?=count(array_filter($dev, fn($d) => $d['role'] === 'endpoint'))?> functions, <?=count($m['roots'])?> root complexes</span>
+<label class="st-dim" style="font-weight:normal;font-size:.8em;cursor:pointer"><input type="checkbox" id="st-fill" onchange="document.getElementById('st-pci').classList.toggle('st-hidefill',!this.checked)"> show empty host bridges</label></h3>
+<?if ($m['acs_override'] !== ''):?>
+<div class="st-banner"><b>ACS override is on</b> (<code>pcie_acs_override=<?=$h($m['acs_override'])?></code>). The kernel splits IOMMU groups as if the ports enforced isolation, but the hardware does not: devices in different groups can still reach each other by peer-to-peer DMA. The groups below are what the kernel uses for passthrough, not real isolation.</div>
+<?endif;?>
+<div class="st-scroll"><table class="st">
+<tr><th>Device</th><th>Role</th><th>Driver</th><th>Link</th><th class="num">IOMMU</th><?if ($multiNode):?><th>NUMA</th><?endif;?><th>Details</th></tr>
+<?foreach ($m['roots'] as $rid => $r):?>
+<tr><td colspan="<?=$multiNode ? 7 : 6?>" style="padding-top:10px"><b>Root complex <?=$h($rid)?></b> <span class="st-dim"><?=$h($r['name'])?><?=$r['iommu'] ? ' &middot; IOMMU ' . $h(substr($r['iommu'], 5)) : ''?><?=$multiNode && $r['numa'] !== null && $r['numa'] >= 0 ? " &middot; NUMA node {$r['numa']}" : ''?></span></td></tr>
+<?foreach ($rows($r['children'], 0, '') as $row): $d = $row['d']; $b = $d['bdf'];
+  $lvl = $levelFor([$b]);
+  $grp = $d['group'] !== null ? ($m['groups'][$d['group']] ?? []) : [];
+  $gTip = $grp ? "IOMMU group {$d['group']}:\n" . implode("\n", array_map(fn($o) => $o . ' ' . $name($dev[$o]) . ($dev[$o]['driver'] ? " [{$dev[$o]['driver']}]" : ''), $grp)) : '';
+  $fill = $d['filler'] || ($d['role'] === 'host bridge' && !$d['children'] && preg_match('/Data Fabric|Dummy|Root Complex/i', $d['name']))
+       || (in_array($d['role'], ['endpoint'], true) && preg_match('/Dummy Function|Reserved SPP|Data Fabric/i', $d['name']) && !$d['driver']);
+?>
+<tr class="<?=$fill ? 'fill' : ''?>"<?=$lvl !== 'ok' ? " style='box-shadow:inset 3px 0 0 " . ['info' => '#1e88e5', 'warn' => '#e68a00', 'crit' => '#d32f2f'][$lvl] . "'" : ''?>>
+<td style="white-space:nowrap"><span class="st-tree"><?=$h($row['tree'])?></span><span class="st-bdf"><?=$h(substr($b, 5))?></span><?=$h($name($d))?><?=$d['subsystem'] !== '' && $d['role'] !== 'endpoint' && !preg_match('/^(Advanced Micro|AMD)/', $d['subsystem']) ? " <span class='st-dim'>(" . $h(pci_short_name(preg_replace('/\s*Device [0-9a-f]{4}$/', '', $d['subsystem']))) . ')</span>' : ''?></td>
+<td class="st-dim"><?=$h($roleText[$d['role']] ?? '')?></td>
+<td><?=$d['driver'] !== '' ? $chip($d['driver'] === 'vfio-pci' ? 'info' : 'dim', $h($d['driver'])) : ''?></td>
+<td style="white-space:nowrap"><?=$linkCell($d)?></td>
+<td class="num" title="<?=$h($gTip)?>"><?=$d['group'] ?? '-'?><?=count($grp) > 1 ? " <span class='st-dim'>(" . count($grp) . ')</span>' : ''?></td>
+<?if ($multiNode):?><td><?=$d['numa'] !== null && $d['numa'] >= 0 ? $d['numa'] : '-'?></td><?endif;?>
+<td><?=$detailChips($d)?></td>
+</tr>
+<?endforeach;?>
+<?endforeach;?>
+</table></div>
+<p class="st-dim" style="margin:4px 0 0 0">Link: current speed and width, "of" what both ends support (the lower of the device's and its port's maximum); hover for both ends. A switch's upstream port and its downstream ports share the switch's internal bus, so only the links into and out of the switch are judged. IOMMU: the group number and, in brackets, how many functions share it; hover for the members.</p>
+</div>
+
+<?$slow = array_column($m['timings'], 'ms'); $slow = array_combine(array_keys($m['timings']), $slow); arsort($slow);?>
+<p class="st-dim">Cache: <code>/var/local/storage-topology/pci/current</code>. <?=count($m['timings'])?> commands; slowest: <?=$h(implode(', ', array_map(fn($k, $v) => "$k $v ms", array_keys(array_slice($slow, 0, 3, true)), array_slice($slow, 0, 3, true))))?>.</p>
+</div>
+<script>
+try { if (localStorage.getItem('st-pci-fill') === '1') document.getElementById('st-fill').checked = true; } catch (e) {}
+document.getElementById('st-pci').classList.toggle('st-hidefill', !document.getElementById('st-fill').checked);
+document.getElementById('st-fill').addEventListener('change', function () { try { localStorage.setItem('st-pci-fill', this.checked ? '1' : '0'); } catch (e) {} });
+</script>
+<?=st_problems_js($var['csrf_token'] ?? '')?>

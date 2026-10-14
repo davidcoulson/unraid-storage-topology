@@ -1,0 +1,9 @@
+/sys/bus/pci/slots/0-1/address:0000:23:00
+/sys/bus/pci/slots/0/address:0000:61:00
+/sys/bus/pci/slots/1/address:0000:24:00
+/sys/bus/pci/slots/2/address:0000:25:00
+/sys/bus/pci/slots/3/address:0000:26:00
+/sys/bus/pci/slots/5/address:0000:27:00
+/sys/bus/pci/slots/6/address:0000:28:00
+/sys/bus/pci/slots/7/address:0000:29:00
+/sys/bus/pci/slots/8/address:0000:2a:00

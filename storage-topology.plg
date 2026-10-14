@@ -24,6 +24,9 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.10.20
+- New page: PCI Topology (Tools > System Information). The PCIe tree per root complex with link speed and width at both ends against what both support, drivers, IOMMU groups (with a banner when the ACS override is on), VM passthrough, slots, SR-IOV, resizable BARs, ASPM and AER counters; the CPU's NUMA nodes, NPS mode, CCDs/CCXs with their L3, isolated CPUs and VM pinning; memory channels and DIMMs with configured and rated speed, EDAC ECC counters and hugepages. Problems (downtrained links, AER errors, ECC errors, unbalanced memory, interrupts on isolated CPUs, VM NUMA/L3/hugepage/IOMMU-group issues) can be acknowledged like on the other pages. Read-only: lspci, dmidecode, sysfs, /proc and the libvirt XML.
+- The diagnostics download includes the PCI page's collection; anonymising also replaces DIMM and board serials and asset tags and removes the unraiduuid from the kernel command line.
 ###2026.10.19
 - Front-panel bay layout: Supermicro backplanes (recognised by Supermicro's SAS address prefix 50030480 or an SMC SES vendor, and their bay count) are drawn as the chassis front with Supermicro's printed bay numbers: SC846/SC847 front (BPN-SAS3-846EL, 24 bays, 4 columns of 6), SC836 (BPN-SAS3-836EL, 16 bays) and SC826 (BPN-SAS3-826EL, 12 bays, numbered 1-12), bay 0 (or 1) at the bottom left, counting up each column. SC216 (24 bays in a row) can be picked by hand.
 - Each shelf's layout can be changed on the page (Auto, a chassis, or the plain grid in SES order); the choice is kept in /boot/config/plugins/storage-topology/layouts.json.
@@ -136,7 +139,7 @@ rm -f $(ls &plgPATH;/&name;-*.txz 2>/dev/null | grep -v '&version;')
 <FILE Run="/bin/bash">
 <INLINE>
 echo ""
-echo "Storage Topology &version; installed: Tools > System Information > Storage Topology and Network Topology"
+echo "Storage Topology &version; installed: Tools > System Information > Storage Topology, Network Topology and PCI Topology"
 command -v sg_ses >/dev/null || echo "Note: sg_ses (sg3_utils) was not found, so enclosure health will be missing."
 found=
 for b in /sbin/storcli /usr/sbin/storcli /usr/local/sbin/storcli /usr/bin/storcli /usr/local/bin/storcli \
@@ -153,7 +156,7 @@ echo ""
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
 removepkg &package;
-rm -rf &plgPATH; /var/local/storage-topology /var/run/storage-topology.lock /var/run/storage-topology-net.lock /var/run/storage-topology-acks.lock
+rm -rf &plgPATH; /var/local/storage-topology /var/run/storage-topology.lock /var/run/storage-topology-net.lock /var/run/storage-topology-pci.lock /var/run/storage-topology-acks.lock
 echo "Storage Topology removed."
 </INLINE>
 </FILE>

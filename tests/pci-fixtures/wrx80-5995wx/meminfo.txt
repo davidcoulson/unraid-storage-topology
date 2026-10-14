@@ -1,0 +1,7 @@
+MemTotal:       527950852 kB
+HugePages_Total:       0
+HugePages_Free:        0
+HugePages_Rsvd:        0
+HugePages_Surp:        0
+Hugepagesize:       2048 kB
+Hugetlb:        67108864 kB

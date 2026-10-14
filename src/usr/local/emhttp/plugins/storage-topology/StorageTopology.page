@@ -81,6 +81,8 @@ tr.st-dim td{opacity:.55}
 <span class="st-dim">Collected <?=$age === null ? 'never' : ($age < 5 ? 'just now' : "{$age} s ago")?>
 (<?=array_sum(array_column($m['timings'], 'ms'))?> ms, read-only storcli/sg_ses, cached 60 s).</span>
 <a href="?refresh=1" style="margin-left:10px">Refresh</a>
+<a href="/Tools/NetworkTopology" style="margin-left:10px">Network Topology</a>
+<a href="/Tools/PciTopology" style="margin-left:10px">PCI Topology</a>
 <?=st_diag_html()?>
 </p>
 <?if ($m['no_sas']):?>

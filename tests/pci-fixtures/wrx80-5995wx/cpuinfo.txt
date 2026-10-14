@@ -1,0 +1,4 @@
+vendor_id	: AuthenticAMD
+cpu family	: 25
+model		: 8
+model name	: AMD Ryzen Threadripper PRO 5995WX 64-Cores

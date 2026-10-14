@@ -1,0 +1,349 @@
+# dmidecode 3.7
+Getting SMBIOS data from sysfs.
+SMBIOS 3.5.0 present.
+
+Handle 0x0011, DMI type 4, 48 bytes
+Processor Information
+	Socket Designation: SP3
+	Type: Central Processor
+	Family: Zen
+	Manufacturer: Advanced Micro Devices, Inc.
+	ID: 82 0F A0 00 FF FB 8B 17
+	Signature: Family 25, Model 8, Stepping 2
+	Flags:
+		FPU (Floating-point unit on-chip)
+		VME (Virtual mode extension)
+		DE (Debugging extension)
+		PSE (Page size extension)
+		TSC (Time stamp counter)
+		MSR (Model specific registers)
+		PAE (Physical address extension)
+		MCE (Machine check exception)
+		CX8 (CMPXCHG8 instruction supported)
+		APIC (On-chip APIC hardware supported)
+		SEP (Fast system call)
+		MTRR (Memory type range registers)
+		PGE (Page global enable)
+		MCA (Machine check architecture)
+		CMOV (Conditional move instruction supported)
+		PAT (Page attribute table)
+		PSE-36 (36-bit page size extension)
+		CLFSH (CLFLUSH instruction supported)
+		MMX (MMX technology supported)
+		FXSR (FXSAVE and FXSTOR instructions supported)
+		SSE (Streaming SIMD extensions)
+		SSE2 (Streaming SIMD extensions 2)
+		HTT (Multi-threading)
+	Version: AMD Ryzen Threadripper PRO 5995WX 64-Cores     
+	Voltage: 1.1 V
+	External Clock: 100 MHz
+	Max Speed: 4550 MHz
+	Current Speed: 2700 MHz
+	Status: Populated, Enabled
+	Upgrade: Socket SP3
+	L1 Cache Handle: 0x000E
+	L2 Cache Handle: 0x000F
+	L3 Cache Handle: 0x0010
+	Serial Number: Unknown
+	Asset Tag: Unknown
+	Part Number: Unknown
+	Core Count: 64
+	Core Enabled: 64
+	Thread Count: 128
+	Characteristics:
+		64-bit capable
+		Multi-Core
+		Hardware Thread
+		Execute Protection
+		Enhanced Virtualization
+		Power/Performance Control
+
+Handle 0x0013, DMI type 16, 23 bytes
+Physical Memory Array
+	Location: System Board Or Motherboard
+	Use: System Memory
+	Error Correction Type: Multi-bit ECC
+	Maximum Capacity: 512 GiB
+	Error Information Handle: 0x0012
+	Number Of Devices: 8
+
+Handle 0x0017, DMI type 17, 92 bytes
+Memory Device
+	Array Handle: 0x0013
+	Error Information Handle: 0x0016
+	Total Width: 72 bits
+	Data Width: 64 bits
+	Size: 64 GiB
+	Form Factor: DIMM
+	Set: None
+	Locator: DIMM 0
+	Bank Locator: P0 CHANNEL A
+	Type: DDR4
+	Type Detail: Synchronous Registered (Buffered)
+	Speed: 3200 MT/s
+	Manufacturer: Samsung
+	Serial Number: SN0001
+	Asset Tag: Not Specified
+	Part Number: M393A8G40AB2-CWE    
+	Rank: 2
+	Configured Memory Speed: 3200 MT/s
+	Minimum Voltage: 1.2 V
+	Maximum Voltage: 1.2 V
+	Configured Voltage: 1.2 V
+	Memory Technology: DRAM
+	Memory Operating Mode Capability: Volatile memory
+	Firmware Version: Unknown
+	Module Manufacturer ID: Bank 1, Hex 0xCE
+	Module Product ID: Unknown
+	Memory Subsystem Controller Manufacturer ID: Unknown
+	Memory Subsystem Controller Product ID: Unknown
+	Non-Volatile Size: None
+	Volatile Size: 64 GiB
+	Cache Size: None
+	Logical Size: None
+
+Handle 0x001A, DMI type 17, 92 bytes
+Memory Device
+	Array Handle: 0x0013
+	Error Information Handle: 0x0019
+	Total Width: 72 bits
+	Data Width: 64 bits
+	Size: 64 GiB
+	Form Factor: DIMM
+	Set: None
+	Locator: DIMM 0
+	Bank Locator: P0 CHANNEL B
+	Type: DDR4
+	Type Detail: Synchronous Registered (Buffered)
+	Speed: 3200 MT/s
+	Manufacturer: Samsung
+	Serial Number: SN0002
+	Asset Tag: Not Specified
+	Part Number: M393A8G40AB2-CWE    
+	Rank: 2
+	Configured Memory Speed: 3200 MT/s
+	Minimum Voltage: 1.2 V
+	Maximum Voltage: 1.2 V
+	Configured Voltage: 1.2 V
+	Memory Technology: DRAM
+	Memory Operating Mode Capability: Volatile memory
+	Firmware Version: Unknown
+	Module Manufacturer ID: Bank 1, Hex 0xCE
+	Module Product ID: Unknown
+	Memory Subsystem Controller Manufacturer ID: Unknown
+	Memory Subsystem Controller Product ID: Unknown
+	Non-Volatile Size: None
+	Volatile Size: 64 GiB
+	Cache Size: None
+	Logical Size: None
+
+Handle 0x001D, DMI type 17, 92 bytes
+Memory Device
+	Array Handle: 0x0013
+	Error Information Handle: 0x001C
+	Total Width: 72 bits
+	Data Width: 64 bits
+	Size: 64 GiB
+	Form Factor: DIMM
+	Set: None
+	Locator: DIMM 0
+	Bank Locator: P0 CHANNEL C
+	Type: DDR4
+	Type Detail: Synchronous Registered (Buffered)
+	Speed: 3200 MT/s
+	Manufacturer: Samsung
+	Serial Number: SN0003
+	Asset Tag: Not Specified
+	Part Number: M393A8G40AB2-CWE    
+	Rank: 2
+	Configured Memory Speed: 3200 MT/s
+	Minimum Voltage: 1.2 V
+	Maximum Voltage: 1.2 V
+	Configured Voltage: 1.2 V
+	Memory Technology: DRAM
+	Memory Operating Mode Capability: Volatile memory
+	Firmware Version: Unknown
+	Module Manufacturer ID: Bank 1, Hex 0xCE
+	Module Product ID: Unknown
+	Memory Subsystem Controller Manufacturer ID: Unknown
+	Memory Subsystem Controller Product ID: Unknown
+	Non-Volatile Size: None
+	Volatile Size: 64 GiB
+	Cache Size: None
+	Logical Size: None
+
+Handle 0x0020, DMI type 17, 92 bytes
+Memory Device
+	Array Handle: 0x0013
+	Error Information Handle: 0x001F
+	Total Width: 72 bits
+	Data Width: 64 bits
+	Size: 64 GiB
+	Form Factor: DIMM
+	Set: None
+	Locator: DIMM 0
+	Bank Locator: P0 CHANNEL D
+	Type: DDR4
+	Type Detail: Synchronous Registered (Buffered)
+	Speed: 3200 MT/s
+	Manufacturer: Samsung
+	Serial Number: SN0004
+	Asset Tag: Not Specified
+	Part Number: M393A8G40AB2-CWE    
+	Rank: 2
+	Configured Memory Speed: 3200 MT/s
+	Minimum Voltage: 1.2 V
+	Maximum Voltage: 1.2 V
+	Configured Voltage: 1.2 V
+	Memory Technology: DRAM
+	Memory Operating Mode Capability: Volatile memory
+	Firmware Version: Unknown
+	Module Manufacturer ID: Bank 1, Hex 0xCE
+	Module Product ID: Unknown
+	Memory Subsystem Controller Manufacturer ID: Unknown
+	Memory Subsystem Controller Product ID: Unknown
+	Non-Volatile Size: None
+	Volatile Size: 64 GiB
+	Cache Size: None
+	Logical Size: None
+
+Handle 0x0023, DMI type 17, 92 bytes
+Memory Device
+	Array Handle: 0x0013
+	Error Information Handle: 0x0022
+	Total Width: 72 bits
+	Data Width: 64 bits
+	Size: 64 GiB
+	Form Factor: DIMM
+	Set: None
+	Locator: DIMM 0
+	Bank Locator: P0 CHANNEL E
+	Type: DDR4
+	Type Detail: Synchronous Registered (Buffered)
+	Speed: 3200 MT/s
+	Manufacturer: Samsung
+	Serial Number: SN0005
+	Asset Tag: Not Specified
+	Part Number: M393A8G40AB2-CWE    
+	Rank: 2
+	Configured Memory Speed: 3200 MT/s
+	Minimum Voltage: 1.2 V
+	Maximum Voltage: 1.2 V
+	Configured Voltage: 1.2 V
+	Memory Technology: DRAM
+	Memory Operating Mode Capability: Volatile memory
+	Firmware Version: Unknown
+	Module Manufacturer ID: Bank 1, Hex 0xCE
+	Module Product ID: Unknown
+	Memory Subsystem Controller Manufacturer ID: Unknown
+	Memory Subsystem Controller Product ID: Unknown
+	Non-Volatile Size: None
+	Volatile Size: 64 GiB
+	Cache Size: None
+	Logical Size: None
+
+Handle 0x0026, DMI type 17, 92 bytes
+Memory Device
+	Array Handle: 0x0013
+	Error Information Handle: 0x0025
+	Total Width: 72 bits
+	Data Width: 64 bits
+	Size: 64 GiB
+	Form Factor: DIMM
+	Set: None
+	Locator: DIMM 0
+	Bank Locator: P0 CHANNEL F
+	Type: DDR4
+	Type Detail: Synchronous Registered (Buffered)
+	Speed: 3200 MT/s
+	Manufacturer: Samsung
+	Serial Number: SN0006
+	Asset Tag: Not Specified
+	Part Number: M393A8G40AB2-CWE    
+	Rank: 2
+	Configured Memory Speed: 3200 MT/s
+	Minimum Voltage: 1.2 V
+	Maximum Voltage: 1.2 V
+	Configured Voltage: 1.2 V
+	Memory Technology: DRAM
+	Memory Operating Mode Capability: Volatile memory
+	Firmware Version: Unknown
+	Module Manufacturer ID: Bank 1, Hex 0xCE
+	Module Product ID: Unknown
+	Memory Subsystem Controller Manufacturer ID: Unknown
+	Memory Subsystem Controller Product ID: Unknown
+	Non-Volatile Size: None
+	Volatile Size: 64 GiB
+	Cache Size: None
+	Logical Size: None
+
+Handle 0x0029, DMI type 17, 92 bytes
+Memory Device
+	Array Handle: 0x0013
+	Error Information Handle: 0x0028
+	Total Width: 72 bits
+	Data Width: 64 bits
+	Size: 64 GiB
+	Form Factor: DIMM
+	Set: None
+	Locator: DIMM 0
+	Bank Locator: P0 CHANNEL G
+	Type: DDR4
+	Type Detail: Synchronous Registered (Buffered)
+	Speed: 3200 MT/s
+	Manufacturer: Samsung
+	Serial Number: SN0007
+	Asset Tag: Not Specified
+	Part Number: M393A8G40AB2-CWE    
+	Rank: 2
+	Configured Memory Speed: 3200 MT/s
+	Minimum Voltage: 1.2 V
+	Maximum Voltage: 1.2 V
+	Configured Voltage: 1.2 V
+	Memory Technology: DRAM
+	Memory Operating Mode Capability: Volatile memory
+	Firmware Version: Unknown
+	Module Manufacturer ID: Bank 1, Hex 0xCE
+	Module Product ID: Unknown
+	Memory Subsystem Controller Manufacturer ID: Unknown
+	Memory Subsystem Controller Product ID: Unknown
+	Non-Volatile Size: None
+	Volatile Size: 64 GiB
+	Cache Size: None
+	Logical Size: None
+
+Handle 0x002C, DMI type 17, 92 bytes
+Memory Device
+	Array Handle: 0x0013
+	Error Information Handle: 0x002B
+	Total Width: 72 bits
+	Data Width: 64 bits
+	Size: 64 GiB
+	Form Factor: DIMM
+	Set: None
+	Locator: DIMM 0
+	Bank Locator: P0 CHANNEL H
+	Type: DDR4
+	Type Detail: Synchronous Registered (Buffered)
+	Speed: 3200 MT/s
+	Manufacturer: Samsung
+	Serial Number: SN0008
+	Asset Tag: Not Specified
+	Part Number: M393A8G40AB2-CWE    
+	Rank: 2
+	Configured Memory Speed: 3200 MT/s
+	Minimum Voltage: 1.2 V
+	Maximum Voltage: 1.2 V
+	Configured Voltage: 1.2 V
+	Memory Technology: DRAM
+	Memory Operating Mode Capability: Volatile memory
+	Firmware Version: Unknown
+	Module Manufacturer ID: Bank 1, Hex 0xCE
+	Module Product ID: Unknown
+	Memory Subsystem Controller Manufacturer ID: Unknown
+	Memory Subsystem Controller Product ID: Unknown
+	Non-Volatile Size: None
+	Volatile Size: 64 GiB
+	Cache Size: None
+	Logical Size: None
+

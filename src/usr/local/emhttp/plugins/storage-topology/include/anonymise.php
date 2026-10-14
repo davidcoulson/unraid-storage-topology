@@ -1,7 +1,7 @@
 <?PHP
 /* Anonymiser for the diagnostics archive. Serial numbers, WWNs, SAS addresses, MAC addresses, NVMe EUIs, PCIe
- * device serial numbers, Mellanox GUIDs, the server's hostname and LLDP switch names (and LLDP management IPs) are
- * replaced. The same input always gives the same token within one archive, and the formats stay valid, so the page
+ * device serial numbers, Mellanox GUIDs, dmidecode serials and asset tags, the server's hostname and LLDP switch
+ * names (and LLDP management IPs) are replaced, and the unraiduuid on the kernel command line is removed. The same input always gives the same token within one archive, and the formats stay valid, so the page
  * can still be rendered from the anonymised files:
  *   SAS address / WWN 5000C500ABCD1224 -> 5000C50 + 5-digit counter + last 16 bits shifted by a per-archive random
  *   offset, e.g. 5000C500000121F7: the NAA and vendor OUI stay, and so do differences in the last 16 bits, so
@@ -43,7 +43,8 @@ function st_anon_scan(array &$st, string $name, string $text): void {
   // SES descriptors: "TP=9C;SN=PMW825620090699;FW=0311;", "MSN=..".
   if (preg_match_all('/(?:^|[;"\s])[A-Z]{0,3}SN=([^;"\n]+)/', $text, $mm)) foreach ($mm[1] as $v) st_anon_literal($st, $v);
   // "Serial Number: X", ethtool -m "Vendor SN : X", lspci VPD "[SN] Serial number: X", ini serial="X".
-  if (preg_match_all('/(?:serial number|vendor sn|\[SN\][^:\n]*)\s*:\s*(\S[^\n]*?)\s*$/im', $text, $mm)) foreach ($mm[1] as $v) st_anon_literal($st, $v);
+  // dmidecode also has "Asset Tag: X" (boards and DIMMs).
+  if (preg_match_all('/(?:serial number|asset tag|vendor sn|\[SN\][^:\n]*)\s*:\s*(\S[^\n]*?)\s*$/im', $text, $mm)) foreach ($mm[1] as $v) st_anon_literal($st, $v);
   if (preg_match_all('/^\s*serial\s*=\s*"?([^"\n]*)"?\s*$/im', $text, $mm)) foreach ($mm[1] as $v) st_anon_literal($st, $v);
   if (preg_match_all(ST_ANON_VSEI, $text, $mm)) foreach ($mm[2] as $hex) if (($b = st_anon_hex_bytes($hex)) !== null)
     if (preg_match_all('/[A-Za-z0-9]{12,}/', $b, $rr)) foreach ($rr[0] as $v) if (preg_match('/\d/', $v) && preg_match('/[A-Za-z]/', $v)) st_anon_literal($st, $v);
@@ -61,6 +62,8 @@ function st_anon_sas(array &$st, string $hex): string {
 // Second pass: replace everything in one file's text. (Callbacks take $st by reference: tokens must persist.)
 function st_anon_text(array &$st, string $name, string $text): string {
   // storcli's raw SCSI inquiry dump spells the serial number out in hex.
+  // The kernel command line carries the Unraid licence (flash) GUID.
+  $text = preg_replace('/\b(unraiduuid=)\S+/', '$1(removed)', $text);
   $text = preg_replace('/("Inquiry Data"\s*:\s*)"[^"]*"/', '$1"(removed)"', $text);
   // lspci VPD vendor-specific fields carry serials, UUIDs and MACs in free form; the page does not use them.
   $text = preg_replace('/(\[V[0-9A-Z]\] Vendor specific:\s*)\S.*$/m', '$1(removed)', $text);

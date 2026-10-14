@@ -1,6 +1,7 @@
 <?php
 /* Renders one plugin page the way Unraid includes it: php tests/render.php <docroot> <Page.page> > page.html
  * $docroot/plugins/storage-topology must hold the plugin. Any PHP notice or warning goes to stderr.
+ * Unraid runs PHP with short_open_tag on (the pages use <?if ...?>): run with php -d short_open_tag=1.
  * Set ST_TOPO_CACHE to render the storage page from a fixture folder, ST_ACK_FILE for the acknowledgement store.
  */
 error_reporting(E_ALL);

@@ -1,0 +1,40 @@
+vm|k3s-ag-2|1|8|8388608|
+pin|k3s-ag-2|0|20
+pin|k3s-ag-2|1|84
+pin|k3s-ag-2|2|21
+pin|k3s-ag-2|3|85
+pin|k3s-ag-2|4|22
+pin|k3s-ag-2|5|86
+pin|k3s-ag-2|6|23
+pin|k3s-ag-2|7|87
+vm|Ubuntu|1|8|4194304|
+pin|Ubuntu|0|16
+pin|Ubuntu|1|80
+pin|Ubuntu|2|17
+pin|Ubuntu|3|81
+pin|Ubuntu|4|18
+pin|Ubuntu|5|82
+pin|Ubuntu|6|19
+pin|Ubuntu|7|83
+vm|Windows 11|0|16|33554432|1048576
+pin|Windows 11|0|8
+pin|Windows 11|1|72
+pin|Windows 11|2|9
+pin|Windows 11|3|73
+pin|Windows 11|4|10
+pin|Windows 11|5|74
+pin|Windows 11|6|11
+pin|Windows 11|7|75
+pin|Windows 11|8|12
+pin|Windows 11|9|76
+pin|Windows 11|10|13
+pin|Windows 11|11|77
+pin|Windows 11|12|14
+pin|Windows 11|13|78
+pin|Windows 11|14|15
+pin|Windows 11|15|79
+emu|Windows 11|2,66
+hostdev|Windows 11|0000:01:00.0
+hostdev|Windows 11|0000:01:00.1
+hostdev|Windows 11|0000:04:00.3
+hostdev|Windows 11|0000:24:00.0

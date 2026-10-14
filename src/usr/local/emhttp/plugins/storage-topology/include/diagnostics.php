@@ -1,5 +1,5 @@
 <?PHP
-/* Diagnostics download (GET, read-only): a .tar.gz of what both pages collected, plus versions and a README.
+/* Diagnostics download (GET, read-only): a .tar.gz of what the three pages collected, plus versions and a README.
  * ?anon=1 (the page's default) anonymises serial numbers, WWNs, SAS addresses, MACs and hostnames consistently
  * (include/anonymise.php) and reduces disks.ini/devs.ini to name, device, type and status.
  * The archive is built in a temporary folder that is removed afterwards.
@@ -13,6 +13,7 @@ $cache = '/var/local/storage-topology';
 // Make sure there is something recent to send (no-ops when the pages collected in the last minute).
 exec("timeout 100 " . escapeshellarg("$em/scripts/collect.sh") . " 60 2>&1");
 exec("timeout 90 " . escapeshellarg("$em/scripts/collect-net.sh") . " 60 2>&1");
+exec("timeout 60 " . escapeshellarg("$em/scripts/collect-pci.sh") . " 60 2>&1");
 
 $tmp = sys_get_temp_dir() . '/storage-topology-diag.' . bin2hex(random_bytes(6));
 $base = 'storage-topology-diagnostics-' . date('Ymd-His') . ($anon ? '-anon' : '');
@@ -38,7 +39,8 @@ function diag_copy(string $from, string $to, string $lockFile): array {
   return $files;
 }
 $files = array_merge(diag_copy("$cache/current", "$root/storage", '/var/run/storage-topology.lock'),
-                     diag_copy("$cache/net/current", "$root/network", '/var/run/storage-topology-net.lock'));
+                     diag_copy("$cache/net/current", "$root/network", '/var/run/storage-topology-net.lock'),
+                     diag_copy("$cache/pci/current", "$root/pci", '/var/run/storage-topology-pci.lock'));
 
 $run = function (string $cmd): string { $o = []; exec("timeout 20 $cmd 2>&1", $o); return trim(implode("\n", $o)); };
 $plg = (string)@file_get_contents('/var/log/plugins/storage-topology.plg');
@@ -104,15 +106,19 @@ What is in here
     timings, *.err               how long each command took, and its error output
 - network/: what the Network Topology page collected (scripts/collect-net.sh): ethtool output, lspci, mstflint query,
   bonding, VLANs, bridges, hwmon, counters (base/ holds the earlier collection used for "growth"), lldpctl JSON.
+- pci/: what the PCI Topology page collected (scripts/collect-pci.sh): lspci -vvv, dmidecode (CPU, memory array and
+  DIMMs), PCI sysfs attributes and links, CPU topology and caches, NUMA nodes and hugepages, EDAC counters, IRQ
+  affinity, the kernel command line, vfio-pci.cfg, and the VMs reduced to names, pinning, memory and passthrough.
 
 How the SES data of each enclosure was read:
 {$sesMethod}
 Anonymised: {$ver['anonymised']}
 When anonymised, serial numbers, WWNs, SAS addresses, MAC addresses, NVMe EUIs, PCIe serial numbers, the server's
-hostname, LLDP switch names and LLDP management addresses are replaced by tokens. The same value always gets the same
-token, so the topology stays readable (SAS addresses keep their vendor prefix and last byte). disks.ini and devs.ini
-are reduced to each disk's name, device, type and status. Interface names (eth0, bond0, br0, ...), PCI addresses
-and disk device names (sdb, nvme0n1) are kept: the topology cannot be read without them.
+hostname, LLDP switch names and LLDP management addresses are replaced by tokens (DIMM and board serials and asset
+tags too); the Unraid licence GUID (unraiduuid) is removed from the kernel command line. The same value always gets
+the same token, so the topology stays readable (SAS addresses keep their vendor prefix and last byte). disks.ini and
+devs.ini are reduced to each disk's name, device, type and status. Interface names (eth0, bond0, br0, ...), PCI
+addresses and disk device names (sdb, nvme0n1) are kept: the topology cannot be read without them.
 
 Nothing here was changed on the server; all commands are read-only queries.
 TXT;

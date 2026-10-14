@@ -1,5 +1,5 @@
 <?PHP
-/* Shared by both pages: acknowledged problems (stored on the flash drive) and the problems list with its
+/* Shared by the three pages: acknowledged problems (stored on the flash drive) and the problems list with its
  * Acknowledge / Unacknowledge controls, plus the diagnostics download link. Also the storage page's bay layout
  * choices (layouts.json, next to acks.json).
  *
@@ -11,7 +11,7 @@
 
 // Tests point this at a temporary file (define ST_ACK_FILE first, or set the environment variable).
 if (!defined('ST_ACK_FILE')) define('ST_ACK_FILE', getenv('ST_ACK_FILE') ?: '/boot/config/plugins/storage-topology/acks.json');
-const ST_ACK_SPACES = ['storage', 'network'];
+const ST_ACK_SPACES = ['storage', 'network', 'pci'];
 const ST_ACK_MAX = 500;               // per page; the oldest acknowledgements are dropped beyond this
 if (!defined('ST_LAYOUT_FILE')) define('ST_LAYOUT_FILE', getenv('ST_LAYOUT_FILE') ?: '/boot/config/plugins/storage-topology/layouts.json');
 const ST_LAYOUT_MAX = 64;
@@ -178,7 +178,7 @@ JS;
 
 function st_diag_html(): string {
   return "<a id='st-diag' href='/plugins/storage-topology/include/diagnostics.php?anon=1' style='margin-left:10px' "
-    . "title='A .tar.gz of what both pages collected, with versions, to attach to a bug report'>Download diagnostics</a> "
+    . "title='A .tar.gz of what the three pages collected, with versions, to attach to a bug report'>Download diagnostics</a> "
     . "<label class='st-dim' style='margin-left:4px;cursor:pointer'><input type='checkbox' id='st-anon' checked "
     . "onchange=\"document.getElementById('st-diag').href='/plugins/storage-topology/include/diagnostics.php?anon='+(this.checked?1:0)\"> "
     . "anonymise (serials, WWNs, SAS addresses, MACs, hostnames)</label>";

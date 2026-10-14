@@ -1,10 +1,13 @@
 # Storage Topology for Unraid
 
-Two read-only pages in **Tools → System Information**:
+Three read-only pages in **Tools → System Information**:
 
 - **Storage Topology**: how your SAS storage is wired and how healthy it is.
 - **Network Topology**: your physical network cards, ports, transceivers, bonds, bridges, VLANs and the switch
   ports they connect to, with link health and error counters.
+- **PCI Topology**: the PCIe tree from the root complexes down to every device, with link speed and width at both
+  ends, drivers, IOMMU groups and VM passthrough; the CPU's NUMA nodes, CCDs and isolated CPUs; and memory channels,
+  DIMMs, ECC counters and hugepages.
 
 ## Storage Topology
 
@@ -89,6 +92,41 @@ optional) and the page joins them the same way sg_ses does. Which way was used i
 The network page only runs `ethtool` queries (settings, `-i`, `-m`, `-S`, `-g`, `--show-fec`), `lspci`,
 `mstflint -d <pci> q` and `lldpctl` (show), and reads `/sys` and `/proc`. It never changes NIC settings.
 
+## PCI Topology
+
+- **CPU and NUMA**: model, sockets, cores and threads, NUMA nodes and the NPS mode (inferred from the number of nodes
+  per socket and L3 caches), and one box per CCD (per CCX on Zen 2, which has two per CCD) with its L3 size and cores.
+  Isolated CPUs (`isolcpus`, with its flags), `nohz_full`, `rcu_nocbs` and the CPUs pinned to each VM are marked, and
+  each CCD shows how many device interrupts it handles. With more than one NUMA node, a node table (CPUs, memory,
+  distances, devices) and a NUMA column in the device tree.
+- **VMs** (from the libvirt definitions; a running VM's live definition): state, vCPUs, the CPUs they are pinned to
+  and which CCDs those are on, emulator pinning, memory, hugepages and the passthrough devices with their driver.
+- **Memory** (`dmidecode -t 16,17` and EDAC): each channel's DIMMs with size, part, type, rank and configured
+  against rated speed; corrected and uncorrectable ECC counts per channel (EDAC numbers its channels, the board
+  letters them: they are paired in order only when the populated channels match in number and size, and the page
+  says so); hugepages reserved and free per size (and per node), and which VMs use them.
+- **PCI devices**: one tree per root complex (host bridges, root ports, switch upstream and downstream ports,
+  endpoints; AMD's empty "dummy" host bridges are hidden behind a checkbox), with each device's role, driver
+  (vfio-pci highlighted), the link's current speed and width against what both ends support (hover for each end
+  and the bandwidth), its IOMMU group and the other members, slot, the VM it is passed through to (or "vfio at boot"
+  from `vfio-pci.cfg`), SR-IOV VFs in use of the total, resizable BAR sizes, ASPM, power state, lane error status, AER
+  counters and interrupt count. Switches show their fan-out (downstream lanes against the lanes into the switch).
+  When `pcie_acs_override` is on, a banner says that the IOMMU groups are what the kernel uses for passthrough, not
+  real isolation.
+- **Problems list**: links running slower or narrower than both ends support (an idle graphics card or a device in
+  D3 that is only slower is a note), AER errors (fatal: critical, non-fatal: warning, corrected: note), device
+  interrupts on isolated CPUs (with the `managed_irq` hint), interrupts on a different NUMA node from their device,
+  VMs whose passthrough device is missing, not bound to vfio-pci while the VM runs, shares an IOMMU group with a
+  device the VM does not take, or sits on another NUMA node than the VM's vCPUs; VMs spread over several L3 caches,
+  running VMs pinned to the same CPUs, too few hugepages reserved or free; ECC errors (uncorrectable: critical,
+  corrected: warning), ECC memory without an EDAC driver, empty or unbalanced channels, DIMMs below their rated
+  speed and mixed part numbers.
+
+The PCI page runs `lspci -D -nn -vvv` and `dmidecode -t 4,16,17` and reads `/sys` (PCI devices and slots, CPU
+topology and caches, NUMA nodes, hugepages, EDAC), `/proc` (IRQ affinity, interrupts, meminfo, the kernel command
+line), `/boot/config/vfio-pci.cfg` and the libvirt XML. It never writes to PCI config space or sysfs and does not
+rebind drivers. Of the VM definitions only names, pinning, memory, hugepages and PCI passthrough addresses are kept.
+
 ## Requirements
 
 - Unraid 7.0 or newer.
@@ -96,6 +134,8 @@ The network page only runs `ethtool` queries (settings, `-i`, `-m`, `-S`, `-g`, 
 - Optional for the network page: `lldpctl` (lldpd, e.g. the LLDP plugin "ulldpd") for switch neighbours, and
   `mstflint` (e.g. the mft-tools plugin) for the flash firmware and PSID of Mellanox/NVIDIA cards. `ethtool` and
   `lspci` ship with Unraid.
+- The PCI page uses `lspci` and `dmidecode` (both ship with Unraid). ECC counters need the kernel's EDAC driver for
+  the memory controller (e.g. `amd64_edac`, `skx_edac`/`i10nm_edac`), which Unraid loads on boards with ECC memory.
 - Optional: Broadcom/LSI `storcli` (or `storcli64`) for controller, port and per-drive detail. It is looked
   for in `/sbin`, `/usr/sbin`, `/usr/local/sbin`, `/usr/bin`, `/usr/local/bin` and `/opt/MegaRAID/storcli`.
   Without it the page uses the kernel's view: SAS HBA and expander PHYs and link rates from `/sys/class/sas_phy`,
@@ -127,6 +167,9 @@ The network page works the same way with its own lock and cache, `/var/local/sto
 page is refreshed often, one between 5 minutes and an hour old, so the window does not shrink to a few seconds.
 A full network collection takes about a second (the `mstflint` query is the slowest part).
 
+The PCI page has its own lock and cache too, `/var/local/storage-topology/pci/current`. A collection takes about half
+a second on a Threadripper PRO with 120 PCI functions (`lspci -vvv` is most of it).
+
 ## What has been tested
 
 - Broadcom MegaRAID 9580-8i8e in JBOD mode with two NetApp DS424 (IOM12) shelves, multipathed.
@@ -139,6 +182,10 @@ A full network collection takes about a second (the `mstflint` query is the slow
   from the ulldpd plugin, Aquantia AQC113 10GBASE-T (atlantic), Intel AX210 Wi-Fi. SFP/SFP+ modules, other drivers'
   counter names and other bond modes are handled from the documented `ethtool`/bonding formats but have had less
   real-hardware testing.
+- PCI: AMD Threadripper PRO 5995WX (WRX80, NPS1, 8 CCDs) with 8 channels of DDR4 RDIMM (amd64_edac), a HighPoint
+  NVMe card with a Broadcom PEX880xx switch, GPUs passed through with vfio-pci, ACS override and 1G hugepages.
+  Multi-socket and multi-node (NPS2/NPS4) layouts, Intel CPUs and Zen 2's two CCXs per CCD are handled from the
+  sysfs formats and covered by synthetic variants, but have had no real-hardware testing.
 
 Reports from other controllers and enclosures are very welcome: please open an issue (or post in the forum
 thread) and attach the file from **Download diagnostics**, anonymised if you prefer.
@@ -177,6 +224,11 @@ DS424's `--join` output with the pages it joins (`netapp-ds424-pages`, to check 
 sg_ses's), and an EMC KTN-STL3 configuration page (`tests/data/`). `php tests/run.php` loads each through the page's
 model, checks the problems list, acknowledgements (against a temporary store), anonymisation, and renders the page
 with all PHP notices enabled.
+
+`tests/pci-fixtures/` holds a real PCI Topology collection from the author's server, anonymised with
+`tests/make_pci_fixture.php` (the diagnostics anonymiser). The tests check its model and problems, then edit copies of
+it to add ECC errors, empty and unbalanced channels, two NUMA nodes, AER errors and VM misconfigurations, and render
+the PCI page from each.
 
 ## License
 
