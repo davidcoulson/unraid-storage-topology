@@ -911,16 +911,17 @@ $xml = <<<XML
     <graphics type='vnc' passwd='hunter2'/>
     <hostdev mode='subsystem' type='pci' managed='yes'><source><address domain='0x0000' bus='0x0a' slot='0x00' function='0x1'/></source></hostdev>
     <hostdev mode='subsystem' type='usb'><source><vendor id='0x1234'/></source></hostdev>
+    <interface type='hostdev' managed='yes'><mac address='52:54:00:aa:bb:cc'/><source><address type='pci' domain='0x0000' bus='0x41' slot='0x00' function='0x2'/></source></interface>
   </devices>
 </domain></domstatus>
 XML;
 $vm = pci_vm_parse($xml);
 t($vm !== null && $vm['name'] === 'Gaming VM' && $vm['mem_kib'] === 16 << 20 && $vm['huge_kib'] === 1048576 && $vm['pins'] === [0 => '8', 1 => '72'] && $vm['emu'] === '2,66'
-  && $vm['numa'] === '0' && $vm['hostdevs'] === ['0000:0a:00.1'], 'live (domstatus) XML parsed: ' . json_encode($vm));
+  && $vm['numa'] === '0' && $vm['hostdevs'] === ['0000:0a:00.1', '0000:41:00.2'], 'live (domstatus) XML parsed, with an <interface type=hostdev> VF: ' . json_encode($vm));
 $lines = implode("\n", pci_vm_lines($vm, true));
-t(!preg_match('/hunter2|52:54:00|secret-name|0b0c0d0e|vdisk/', $lines), 'VM lines carry no disks, MACs, passwords or UUIDs');
+t(!preg_match('/hunter2|52:54:00|aa:bb:cc|secret-name|0b0c0d0e|vdisk/', $lines), 'VM lines carry no disks, MACs, passwords or UUIDs');
 $vms = pci_parse_vms(explode("\n", $lines));
-t(isset($vms['Gaming VM']) && $vms['Gaming VM']['running'] && $vms['Gaming VM']['hostdevs'] === ['0000:0a:00.1'] && $vms['Gaming VM']['huge_kib'] === 1048576, 'VM lines read back');
+t(isset($vms['Gaming VM']) && $vms['Gaming VM']['running'] && $vms['Gaming VM']['hostdevs'] === ['0000:0a:00.1', '0000:41:00.2'] && $vms['Gaming VM']['huge_kib'] === 1048576, 'VM lines read back');
 t(pci_vm_parse('<domain><name>x</name><memory>1048576</memory><memoryBacking><hugepages/></memoryBacking></domain>')['huge_kib'] === 0 && pci_vm_parse('not xml') === null, 'hugepages without a size; broken XML ignored');
 // The anonymiser removes the licence GUID from the kernel command line and DIMM serials from dmidecode.
 $st = st_anon_new([], 0);

@@ -240,13 +240,17 @@ function pci_vm_parse(string $xml): ?array {
   foreach ($dom->cputune->vcpupin ?? [] as $p) $vm['pins'][(int)$p['vcpu']] = (string)$p['cpuset'];
   if (isset($dom->cputune->emulatorpin)) $vm['emu'] = (string)$dom->cputune->emulatorpin['cpuset'];
   if (isset($dom->numatune->memory)) $vm['numa'] = (string)$dom->numatune->memory['nodeset'];
-  foreach ($dom->devices->hostdev ?? [] as $h) {
-    if ((string)$h['type'] !== 'pci') continue;
+  // PCI passthrough: <hostdev type='pci'> and SR-IOV/NIC passthrough as <interface type='hostdev'>.
+  $hex = fn($s, $w) => str_pad(strtolower(preg_replace('/^0x/i', '', (string)$s)), $w, '0', STR_PAD_LEFT);
+  $srcs = [];
+  foreach ($dom->devices->hostdev ?? [] as $h) if ((string)$h['type'] === 'pci') $srcs[] = $h->source->address ?? null;
+  foreach ($dom->devices->interface ?? [] as $h) if ((string)$h['type'] === 'hostdev') {
     $a = $h->source->address ?? null;
-    if (!$a) continue;
-    $hex = fn($s, $w) => str_pad(strtolower(preg_replace('/^0x/i', '', (string)$s)), $w, '0', STR_PAD_LEFT);
-    $vm['hostdevs'][] = $hex($a['domain'] ?: '0', 4) . ':' . $hex($a['bus'], 2) . ':' . $hex($a['slot'], 2) . '.' . (int)hexdec(preg_replace('/^0x/i', '', (string)$a['function']));
+    if ($a && in_array((string)($a['type'] ?: 'pci'), ['pci'], true)) $srcs[] = $a;
   }
+  foreach ($srcs as $a) if ($a && (string)$a['bus'] !== '')
+    $vm['hostdevs'][] = $hex($a['domain'] ?: '0', 4) . ':' . $hex($a['bus'], 2) . ':' . $hex($a['slot'], 2) . '.' . (int)hexdec(preg_replace('/^0x/i', '', (string)$a['function']));
+  $vm['hostdevs'] = array_values(array_unique($vm['hostdevs']));
   ksort($vm['pins']);
   return $vm;
 }
