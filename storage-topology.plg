@@ -2,8 +2,8 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name       "storage-topology">
 <!ENTITY author     "davidcoulson">
-<!ENTITY version    "2026.10.20">
-<!ENTITY md5        "8bfe3f6b0a8e415831bc8c1e1d7f6aa7">
+<!ENTITY version    "2026.11.14">
+<!ENTITY md5        "fc3f6df02b92dfdfe4de27d84fcb2310">
 <!ENTITY launch     "Tools/StorageTopology">
 <!ENTITY gitURL     "https://github.com/davidcoulson/unraid-storage-topology">
 <!ENTITY pluginURL  "https://raw.githubusercontent.com/davidcoulson/unraid-storage-topology/main/storage-topology.plg">
@@ -24,6 +24,12 @@
         support="&supportURL;" project="&gitURL;" icon="sitemap" min="7.0.0">
 
 <CHANGES>
+###2026.11.14
+- SAS addresses made only of digits are read as hex, so drives are matched to the right HBA port and enclosure.
+- A drive with a second (multipath) device keeps its Unraid assignment.
+- PCI devices in other domains (for example behind Intel VMD) appear on the PCI page, and PCI addresses keep their domain.
+- MegaRAID hot spares are shown as healthy; rebuilding and copyback drives show a warning instead of Critical.
+- Drives on a storcli controller are no longer listed a second time under another HBA.
 ###2026.10.20
 - New page: PCI Topology (Tools > System Information). The PCIe tree per root complex with link speed and width at both ends against what both support, drivers, IOMMU groups (with a banner when the ACS override is on), VM passthrough, slots, SR-IOV, resizable BARs, ASPM and AER counters; the CPU's NUMA nodes, NPS mode, CCDs/CCXs with their L3, isolated CPUs and VM pinning; memory channels and DIMMs with configured and rated speed, EDAC ECC counters and hugepages. Problems (downtrained links, AER errors, ECC errors, unbalanced memory, interrupts on isolated CPUs, VM NUMA/L3/hugepage/IOMMU-group issues) can be acknowledged like on the other pages. Read-only: lspci, dmidecode, sysfs, /proc and the libvirt XML.
 - The diagnostics download includes the PCI page's collection; anonymising also replaces DIMM and board serials and asset tags and removes the unraiduuid from the kernel command line.

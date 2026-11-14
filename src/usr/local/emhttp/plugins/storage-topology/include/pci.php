@@ -99,8 +99,8 @@ function pci_short_name(string $name): string {
 // lspci -D -nn -vvv: one block per function.
 function pci_parse_lspci(string $text): array {
   $out = [];
-  foreach (preg_split('/\n(?=[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7] )/', $text) as $block) {
-    if (!preg_match('/^([0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]) (.+?) \[([0-9a-f]{4})\]: (.+?) \[([0-9a-f]{4}):([0-9a-f]{4})\](?: \(rev ([0-9a-f]+)\))?(?: \(prog-if [^)]*\))?\s*$/m', $block, $mm)) continue;
+  foreach (preg_split('/\n(?=[0-9a-f]{4,5}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7] )/', $text) as $block) {
+    if (!preg_match('/^([0-9a-f]{4,5}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]) (.+?) \[([0-9a-f]{4})\]: (.+?) \[([0-9a-f]{4}):([0-9a-f]{4})\](?: \(rev ([0-9a-f]+)\))?(?: \(prog-if [^)]*\))?\s*$/m', $block, $mm)) continue;
     $d = ['bdf' => $mm[1], 'classname' => $mm[2], 'name' => $mm[4], 'rev' => $mm[7] ?? '', 'subsystem' => '', 'slot' => '', 'type' => '',
           'lnkcap' => null, 'lnksta' => null, 'aspm_cap' => '', 'aspm' => '', 'dlactive' => null, 'rebar' => [], 'modules' => '', 'driver' => '',
           'lane_err' => '', 'acs' => null];
@@ -132,7 +132,7 @@ function pci_parse_lspci(string $text): array {
 function pci_parse_attrs(array $lines): array {
   $out = [];
   foreach ($lines as $l) {
-    if (!preg_match('#^/sys/bus/pci/devices/([0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7])/([a-z0-9_/]+):(.*)$#', $l, $mm)) continue;
+    if (!preg_match('#^/sys/bus/pci/devices/([0-9a-f]{4,5}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7])/([a-z0-9_/]+):(.*)$#', $l, $mm)) continue;
     [, $bdf, $attr, $v] = $mm;
     if (str_starts_with($attr, 'aer_dev_')) { if (preg_match('/^(\S+) (\d+)$/', $v, $a)) $out[$bdf][$attr][$a[1]] = (int)$a[2]; }
     else $out[$bdf][$attr] = trim($v);
@@ -395,11 +395,11 @@ function pci_devices(string $dir, array &$m): void {
   $slots = [];
   foreach (pci_lines("$dir/slots.txt") as $l) if (preg_match('#/slots/([^/]+)/address:([0-9a-f:]+)#', $l, $mm)) $slots[$mm[2]] = $mm[1];
   $vfioBoot = [];
-  foreach (pci_lines("$dir/vfio-pci.cfg") as $l) if (preg_match_all('/([0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7])/i', $l, $mm)) foreach ($mm[1] as $b) $vfioBoot[strtolower($b)] = true;
+  foreach (pci_lines("$dir/vfio-pci.cfg") as $l) if (preg_match_all('/([0-9a-f]{4,5}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7])/i', $l, $mm)) foreach ($mm[1] as $b) $vfioBoot[strtolower($b)] = true;
   $irqCpu = []; $irqName = [];
   foreach (pci_lines("$dir/irqaff.txt") as $l) if (preg_match('#/proc/irq/(\d+)/effective_affinity_list:(.*)$#', $l, $mm)) $irqCpu[(int)$mm[1]] = pci_cpus($mm[2]);
   foreach (pci_lines("$dir/irqnames.txt") as $l) { [$n, $name] = array_pad(explode('|', $l, 2), 2, ''); if (ctype_digit($n)) $irqName[(int)$n] = $name; }
-  $re = '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]';
+  $re = '[0-9a-f]{4,5}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]';
   $links = []; $msi = [];
   foreach (pci_lines("$dir/pcilinks.txt") as $l)
     if (preg_match("#/($re)/*\|(driver|iommu_group|physfn)\|(.*)$#", $l, $mm)) $links[$mm[1]][$mm[2]] = basename($mm[3]);
@@ -425,8 +425,8 @@ function pci_devices(string $dir, array &$m): void {
     $dev[$bdf] = [
       'bdf' => $bdf, 'name' => $l2['name'], 'short' => pci_short_name($l2['name']), 'classname' => $l2['classname'], 'class' => $class,
       'vendor_id' => $a['vendor'] ?? '', 'device_id' => $a['device'] ?? '', 'subsystem' => $l2['subsystem'], 'rev' => $l2['rev'],
-      'parent' => preg_match('/^[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]$/', $parent) ? $parent : null,
-      'root' => preg_match('/^pci([0-9a-f]{4}:[0-9a-f]{2})$/', $parent, $mm) ? $mm[1] : null, 'children' => [],
+      'parent' => preg_match('/^[0-9a-f]{4,5}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]$/', $parent) ? $parent : null,
+      'root' => preg_match('/^pci([0-9a-f]{4,5}:[0-9a-f]{2})$/', $parent, $mm) ? $mm[1] : null, 'children' => [],
       'driver' => $drv !== '' ? $drv : $l2['driver'], 'modules' => $l2['modules'], 'group' => $grp === '' ? null : (int)$grp, 'physfn' => $pf ?: null, 'vfs' => [],
       'numa' => $int($a['numa_node'] ?? null), 'local_cpus' => $a['local_cpulist'] ?? '',
       'cur_speed' => $gts($a['current_link_speed'] ?? ''), 'cur_width' => $int($a['current_link_width'] ?? null),
