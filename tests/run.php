@@ -162,6 +162,16 @@ t($where === ['c0 e252 slot 3', 'c0 slot 5'], 'drives in virtual enclosure 252 a
 t(array_map(fn($x) => $m['drives'][$x['drive']]['unraid'], $m['direct']) == ['disk1', 'disk2'] || array_map(fn($x) => $m['drives'][$x['drive']]['unraid'], $m['direct']) == ['disk2', 'disk1'], 'with their Unraid names');
 t(!matching($m, '/below|Collection/'), 'SATA links at 6G are fine, no collection errors: ' . dump_problems($m));
 t(count($m['controllers'][0]['connectors'] ?? []) === 2, 'two derived connectors');
+// Hot spares are healthy, a rebuilding drive is a warning, anything else unexpected is critical.
+$d6 = "$tmp/storcli-states";
+foreach (['GHS' => null, 'DHS' => null, 'Rbld' => 'warn', 'Offln' => 'crit'] as $st => $lvl) {
+  copy_dir("$fx/storcli-direct", $d6);
+  file_put_contents("$d6/drives.json", preg_replace('/"State": "JBOD"/', '"State": "' . $st . '"', file_get_contents("$d6/drives.json"), 1));
+  $ms = load($d6);
+  $got = array_values(array_unique(array_column(matching($ms, "/ state $st\$/"), 'level')));
+  t($got === ($lvl === null ? [] : [$lvl]), "storcli state $st gives " . ($lvl ?? 'no problem') . ': ' . json_encode($got));
+  rm_dir($d6);
+}
 
 // ---------------------------------------------------------------------------------------------------------
 $section = 'emc-ktn-stl3';
@@ -332,7 +342,10 @@ copy_dir($dir, $d2);
 file_put_contents("$d2/ctrl.json", str_replace('500605b0c0de0000', '500605b0c0de1111', file_get_contents("$d2/ctrl.json")));
 $m2 = load($d2);
 t(count($m2['controllers']) === 1 && !empty($m2['controllers'][0]['kernel_ports']), 'matched by PCI address (00:01:00:00 = 0000:01:00.0)');
-t(topo_pci('00:01:00:00') === '01:00.0' && topo_pci('0000:2b:00.0') === '2b:00.0' && topo_pci('0000:2B:00.1') === topo_pci('00:2b:00:01') && topo_pci('') === '', 'PCI addresses compared in one form');
+t(topo_pci('00:01:00:00') === '0000:01:00.0' && topo_pci('0000:2b:00.0') === '0000:2b:00.0' && topo_pci('0000:2B:00.1') === topo_pci('00:2b:00:01') && topo_pci('') === '', 'PCI addresses compared in one form');
+t(topo_pci('0001:01:00.0') !== topo_pci('0000:01:00.0') && topo_pci('10000:e0:06.0') === '10000:e0:06.0', 'the PCI domain is kept, so HBAs in different domains differ');
+t(topo_addr('5003048001234567') === '5003048001234567' && topo_addr('0x5003048001234567') === '5003048001234567' && topo_addr('5003048001234567', true) === '0011C63EE2E86687'
+  && topo_addr(5003048001234567) === '0011C63EE2E86687', 'digit-only SAS address is hex unless it comes from sg_ses JSON (decimal)');
 // A real status from storcli is still raised; ports storcli does report are kept.
 $d3 = "$tmp/3008-degraded";
 copy_dir($dir, $d3);
@@ -731,6 +744,11 @@ foreach (glob("$fx/*", GLOB_ONLYDIR) as $d) {
 $section = 'pci';
 // PCI Topology on a real collection (Threadripper PRO 5995WX on WRX80, anonymised: tests/make_pci_fixture.php).
 require_once "$plug/include/pci.php";
+// Intel VMD child buses have a five-digit domain; they start their own lspci block and keep their sysfs attributes.
+$vl = pci_parse_lspci("0000:00:01.0 PCI bridge [0604]: Test Bridge [8086:0001] (rev 01)\n\tKernel driver in use: pcieport\n"
+  . "10000:e0:06.0 Non-Volatile memory controller [0108]: Test NVMe [144d:a80a]\n\tKernel driver in use: nvme\n");
+t(array_keys($vl) === ['0000:00:01.0', '10000:e0:06.0'] && $vl['0000:00:01.0']['driver'] === 'pcieport' && $vl['10000:e0:06.0']['driver'] === 'nvme', 'lspci block at a five-digit domain is parsed on its own');
+t((pci_parse_attrs(['/sys/bus/pci/devices/10000:e0:06.0/numa_node:0'])['10000:e0:06.0']['numa_node'] ?? null) === '0', 'sysfs attributes of a five-digit domain are read');
 $pfx = __DIR__ . '/pci-fixtures/wrx80-5995wx';
 function pload(string $dir): array { $m = pci_load($dir); st_acks_apply($m, 'pci'); return $m; }
 // A copy of the fixture with $edit(dir) applied: each file can be rewritten with pedit().

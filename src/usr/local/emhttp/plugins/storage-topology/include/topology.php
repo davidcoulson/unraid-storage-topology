@@ -52,6 +52,10 @@ function topo_ses_str(string $s): string {
 }
 
 // "TP=9C;SN=ABC123;FW=0311;" -> [TP=>9C, SN=>ABC123, FW=>0311]. Empty values are dropped.
+// storcli drive states: healthy (incl. global/dedicated hot spare), working but degraded, and everything else is Critical.
+const TOPO_STATE_OK = ['Onln', 'JBOD', 'UGood', 'GHS', 'DHS'];
+const TOPO_STATE_WARN = ['Rbld', 'Cpybck'];
+
 function topo_kv(string $s): array {
   $out = [];
   foreach (explode(';', $s) as $part) {
@@ -63,9 +67,10 @@ function topo_kv(string $s): array {
   return $out;
 }
 
-function topo_addr($a): string {
+// $dec: digit-only strings are decimal (sg_ses JSON); otherwise they are hex that merely lacks a letter or 0x.
+function topo_addr($a, bool $dec = false): string {
   if ($a === null || $a === '') return '';
-  if (is_int($a) || ctype_digit((string)$a)) {
+  if (is_int($a) || ($dec && ctype_digit((string)$a))) {
     $hex = function_exists('gmp_init') ? gmp_strval(gmp_init((string)$a, 10), 16) : base_convert((string)$a, 10, 16);
     return strtoupper(str_pad($hex, 16, '0', STR_PAD_LEFT));
   }
@@ -205,7 +210,7 @@ function topo_unraid_names(string $dir): array {
       $dev = $d['device'] ?? '';
       if ($dev === '') continue;
       $serial = $dev2serial[$dev] ?? '';
-      if ($serial === '') continue;
+      if ($serial === '' || ($unassigned && isset($out[$serial]))) continue;   // a second path of an assigned disk stays assigned
       $out[$serial] = ['name' => $unassigned ? '' : ($d['name'] ?? $key), 'type' => $unassigned ? 'Unassigned' : ($d['type'] ?? ''),
                        'device' => $dev, 'status' => $d['status'] ?? '', 'spundown' => ($d['spundown'] ?? '0') === '1',
                        'temp' => is_numeric($d['temp'] ?? '') ? (int)$d['temp'] : null,
@@ -502,7 +507,7 @@ function topo_ses(string $dir, array &$m, array &$labels, array $k, array $names
           $x['clear_cmd'] = !$x['fault_reqstd'] ? '' : 'sg_ses ' . (isset($ae['device_slot_number']) ? "--dev-slot-num={$ae['device_slot_number']}" : "--index=$th,{$x['n']}")
             . " --clear=fault /dev/$sg";
           $x['ident'] = !empty($sd['ident']);
-          $x['phys'] = array_map(fn($p) => topo_addr($p['sas_address'] ?? ''), $ae['phy_descriptor_list'] ?? []);
+          $x['phys'] = array_map(fn($p) => topo_addr($p['sas_address'] ?? '', true), $ae['phy_descriptor_list'] ?? []);
           $g['slot'][] = $x; break;
         case 2:
           $x['flags'] = array_keys(array_filter(array_intersect_key($sd, array_flip(['dc_over_voltage', 'dc_under_voltage',
@@ -705,7 +710,7 @@ function topo_ses_config(string $dir, string $sg, array $els): array {
   foreach ($j['enclosure_descriptor_list'] ?? [] as $d) {
     $id = $int($d['subenclosure_identifier'] ?? -1);
     $subs[$id] = ['id' => $id, 'vendor' => topo_ses_str($d['enclosure_vendor_identification'] ?? ''), 'product' => topo_ses_str($d['product_identification'] ?? ''),
-                  'rev' => topo_ses_str($d['product_revision_level'] ?? ''), 'wwn' => topo_addr($d['enclosure_logical_identifier'] ?? '')];
+                  'rev' => topo_ses_str($d['product_revision_level'] ?? ''), 'wwn' => topo_addr($d['enclosure_logical_identifier'] ?? '', true)];
   }
   $headers = [];
   foreach ($j['type_descriptor_header_and_text_list'] ?? [] as $t)
@@ -771,11 +776,11 @@ function topo_simple_enclosure(string $dir, array $m, array $k, array $names, st
           'groups' => $g, 'disks' => array_values($disks), 'bays' => $bays, 'disk_source' => $source];
 }
 
-// PCI address in one form for both sources: storcli "00:01:00:00" and sysfs "0000:01:00.0" -> "01:00.0"; '' if neither.
+// PCI address in one form for both sources: storcli "00:01:00:00" and sysfs "0000:01:00.0" -> "0000:01:00.0"; '' if neither.
 function topo_pci(string $a): string {
   $a = trim($a);
-  if (preg_match('/^[0-9a-f]{1,4}:([0-9a-f]{1,2}):([0-9a-f]{1,2})[:.]([0-9a-f]{1,2})$/i', $a, $mm))
-    return sprintf('%02x:%02x.%x', hexdec($mm[1]), hexdec($mm[2]), hexdec($mm[3]));
+  if (preg_match('/^([0-9a-f]{1,5}):([0-9a-f]{1,2}):([0-9a-f]{1,2})[:.]([0-9a-f]{1,2})$/i', $a, $mm))
+    return sprintf('%04x:%02x:%02x.%x', hexdec($mm[1]), hexdec($mm[2]), hexdec($mm[3]), hexdec($mm[4]));
   return '';
 }
 
@@ -1075,6 +1080,7 @@ function topo_direct(array &$m, array $names, array $k, array $labels): void {
   foreach ($m['enclosures'] as $e) foreach ($e['disks'] as $d) $placedDevs[$d['dev']] = true;
   foreach ($m['drives'] as $id => $d) {
     if (!empty($d['placed']) || $d['ctrl'] === null) continue;
+    if ($d['dev'] !== '') $placedDevs[$d['dev']] = true;   // listed here from storcli; the kernel loop below must not add it again
     $m['direct'][] = ['drive' => $id, 'where' => "c{$d['ctrl']} " . ($d['eid'] !== null ? "e{$d['eid']} " : '') . "slot {$d['slot']}",
                       'note' => $d['eid'] !== null ? "Enclosure e{$d['eid']} has no SES device this page can read (often a backplane without SES)." : 'Not in an enclosure.'];
   }
@@ -1340,7 +1346,8 @@ function topo_problems(array &$m): void {
   foreach ($m['drives'] as $id => $d) {
     $who = $d['unraid'] ?: ($d['dev'] ?: ($d['eid'] !== null ? "e{$d['eid']}/s{$d['slot']}" : "s{$d['slot']}"));
     $dk = 'drive|' . ($d['serial'] ?: $who);
-    if ($d['state'] && !in_array($d['state'], ['Onln', 'JBOD', 'UGood'], true)) $add('crit', "Drive $who state {$d['state']}", "$dk|state", $d['state']);
+    if (in_array($d['state'], TOPO_STATE_WARN, true)) $add('warn', "Drive $who state {$d['state']}", "$dk|state", $d['state']);
+    elseif ($d['state'] && !in_array($d['state'], TOPO_STATE_OK, true)) $add('crit', "Drive $who state {$d['state']}", "$dk|state", $d['state']);
     if ($d['smart_alert']) $add('crit', "Drive $who: SMART alert", "$dk|smart", '');
     if ((int)$d['pred_fail'] > 0) $add('crit', "Drive $who: predictive failure count {$d['pred_fail']}", "$dk|pred", $d['pred_fail']);
     if ((int)$d['media_err'] > 0) $add('warn', "Drive $who: {$d['media_err']} media errors", "$dk|media", $d['media_err']);

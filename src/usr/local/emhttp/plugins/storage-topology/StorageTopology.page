@@ -268,8 +268,8 @@ $bayTile = function (array $x, string $label, string $style) use ($drives, $h, $
       . ($narrow ? '' : '<br><span class="st-dim">no disk linked to this bay</span>')) . ($faultTag ? "<br>$faultTag" : '') . '</div>';
   }
   $dl = topo_worst(array_filter([
-    ($d['smart_alert'] || (int)$d['pred_fail'] > 0 || ($d['state'] !== '' && !in_array($d['state'], ['Onln', 'JBOD', 'UGood'], true))) ? 'crit' : null,
-    ((int)$d['media_err'] > 0 || !empty($x['fault_sensed']) || in_array($x['level'], ['warn', 'crit'], true)) ? 'warn' : null,
+    ($d['smart_alert'] || (int)$d['pred_fail'] > 0 || ($d['state'] !== '' && !in_array($d['state'], array_merge(TOPO_STATE_OK, TOPO_STATE_WARN), true))) ? 'crit' : null,
+    ((int)$d['media_err'] > 0 || in_array($d['state'], TOPO_STATE_WARN, true) || !empty($x['fault_sensed']) || in_array($x['level'], ['warn', 'crit'], true)) ? 'warn' : null,
     ((int)$d['other_err'] > 0 || !empty($x['fault_reqstd']) || ($d['max_rate'] && $d['rate'] < $d['max_rate'])) ? 'info' : null,
   ]));
   $tip = $sesTip . trim("{$d['vendor']} {$d['model']}") . " SN {$d['serial']} FW {$d['fw']}\n{$d['size']} {$d['intf']} {$d['state']}"
